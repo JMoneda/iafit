@@ -1,0 +1,173 @@
+name: research
+version: 1
+description: >
+  Flujo de comprensión SOLO-LECTURA para zonas heredadas o sin documentar.
+  Produce scope.md -> walkthrough.md (un "Linear walkthrough" al estilo Simon
+  Willison) -> specs/**/*.md que documentan el comportamiento ACTUAL en formato
+  OpenSpec (requisito/escenario). NUNCA edita código fuente. El objetivo es la
+  comprensión y specs duraderas, NO una propuesta de cambio. Para actuar sobre lo
+  aprendido, inicia un cambio aparte (por ejemplo migracion-incremental) que haga
+  delta contra estas specs.
+  IMPORTANTE: TODOS los artefactos se redactan en ESPAÑOL.
+artifacts:
+  - id: scope
+    generates: scope.md
+    description: Límites de la zona a comprender y qué se debe aprender
+    template: scope.md
+    instruction: >
+      Define los LÍMITES de esta investigación ANTES de leer código.
+
+
+      Este cambio es SOLO-LECTURA y su propósito es COMPRENDER, no cambiar. Estás
+      documentando cómo funciona hoy una zona para que un mantenedor futuro (o un
+      cambio de migración posterior) pueda confiar en la documentación en vez de
+      releer el monolito. Mantener el alcance acotado es lo que mantiene contenida
+      la investigación.
+
+
+      Redacta TODO en español. Secciones:
+
+      - **Zona**: la porción del sistema bajo investigación (p. ej. "el cliente de
+      Open-Meteo: pronóstico, geocodificación, geocodificación inversa"). Sé
+      concreto con los puntos de entrada.
+
+      - **Preguntas**: las cosas específicas a aprender sobre CÓMO funciona, como
+      lista numerada. Cada una debe poder responderse leyendo código/pruebas.
+
+      - **En alcance**: archivos, módulos, rutas, tablas a leer.
+
+      - **Fuera de alcance**: qué NO leer. Tan importante como lo anterior: frena
+      el anti-patrón de "leer todo el monolito". Si te encuentras leyendo código
+      fuera de alcance, DETENTE y agrégalo a la lista de fuera de alcance.
+
+      - **Listo cuando**: walkthrough.md explica el flujo de punta a punta, y cada
+      comportamiento observable tiene un requisito+escenario en la spec.
+
+
+      Esto es un mapa de dónde mirar, no las respuestas. Las respuestas van en el
+      walkthrough y en la spec.
+    requires: []
+  - id: walkthrough
+    generates: walkthrough.md
+    description: Recorrido lineal de cómo funciona realmente la zona
+    template: walkthrough.md
+    instruction: >
+      Escribe un RECORRIDO LINEAL de cómo funciona esta zona HOY: una visita guiada
+      que permita a quien lo lea entenderla SIN leer el código fuente. Es el
+      artefacto de "recuperar comprensión" (patrón Linear walkthrough de Simon
+      Willison): narrativo y en orden, siguiendo la ejecución/los datos desde la
+      entrada hasta la salida.
+
+
+      Describe lo que el código HACE hoy. Esto NO es una revisión: sin caza de
+      riesgos, sin "debería", sin recomendaciones, sin propuestas. Explicación pura.
+      Redacta TODO en español.
+
+
+      SNIPPETS EJECUTADOS (obligatorio): NUNCA transcribas código a mano. Extrae
+      cada fragmento ejecutando un comando ('sed -n A,Bp', 'grep -n', 'cat -n') y
+      embebe el comando junto con su salida real. Es la disciplina de la regla
+      'documentacion-walkthrough' del MCP (get_rule category="migration"
+      slug="documentacion-walkthrough"): primero comprueba 'uvx showboat --help';
+      si Showboat está disponible úsalo ('showboat note' para prosa, 'showboat exec'
+      para snippets); si no, usa el fallback portable (bloque con el comando + su
+      salida literal). Esto elimina el riesgo de alucinación.
+
+
+      - Cada paso cita evidencia como 'ruta/al/archivo.ts:línea' (un rango está
+      bien) y el rango DEBE coincidir con el comando de extracción mostrado. Sin
+      comando ejecutado, no hay snippet; sin archivo:línea, no hay afirmación.
+
+      - Mantente dentro de "En alcance" de scope.md. Si debes salir, anótalo en
+      "Desviaciones de alcance" y di por qué.
+
+
+      Estructura (adáptala a la zona):
+
+      - **Puntos de entrada**: dónde entra la ejecución/los datos a esta zona, y
+      quién la llama. ('archivo:línea')
+
+      - **Recorrido lineal**: una visita numerada y en orden del camino principal
+      de entrada a salida. Cada paso: qué ocurre + 'archivo:línea'. Sigue el flujo
+      real de control/datos, ramifica donde el código ramifica, y nombra las
+      estructuras/tipos de datos clave a medida que aparecen.
+
+      - **Variaciones y casos borde**: los otros caminos (errores, datos vacíos,
+      entradas alternativas) y dónde divergen. ('archivo:línea')
+
+      - **Cómo encajan las piezas**: síntesis breve de los módulos involucrados y
+      cómo se conectan.
+
+
+      Un buen recorrido se lee como un guía que conoce cada rincón: alguien puede
+      seguir cómo funciona todo, paso a paso, desde este archivo solo.
+    requires:
+      - scope
+  - id: spec
+    generates: specs/**/*.md
+    description: Comportamiento ACTUAL formalizado como requisitos y escenarios OpenSpec
+    template: spec.md
+    instruction: >
+      Formaliza el comportamiento ACTUAL descrito en walkthrough.md al formato de
+      spec de OpenSpec. Estas specs documentan lo que el sistema HACE hoy: son una
+      línea base, no un cambio. Al archivar se fusionan en openspec/specs/ como la
+      fuente de verdad documentada de esta capacidad. Redacta TODO en español
+      (los nombres de capacidad en kebab-case pueden ir en inglés si el código lo usa).
+
+
+      Crea un archivo de spec por capacidad de la zona: specs/<capacidad>/spec.md
+      con nombre en kebab-case. Revisa openspec/specs/ primero: si ya existe una
+      spec para esta capacidad, reconcilia con ella en vez de duplicar.
+
+
+      Como esto registra comportamiento existente, pon los requisitos bajo:
+
+
+      ## ADDED Requirements
+
+
+      Formato:
+
+      - Cada requisito: '### Requirement: <nombre>' seguido de una afirmación
+      SHALL/MUST que describe el comportamiento observado (evita should/may).
+
+      - Cada escenario: '#### Scenario: <nombre>' con WHEN/THEN.
+
+      - **CRÍTICO**: los escenarios DEBEN usar exactamente 4 numerales ('####').
+      Usar 3 numerales o viñetas falla silenciosamente.
+
+      - Cada requisito DEBE tener al menos un escenario.
+
+
+      Deriva todo de walkthrough.md (que está evidenciado por archivo:línea). NO
+      inventes comportamiento que el walkthrough no sustente; si algo se desconoce,
+      déjalo fuera en vez de adivinar. Cada escenario debe poder ser una prueba de
+      caracterización del comportamiento que existe ahora mismo.
+    requires:
+      - walkthrough
+apply:
+  requires:
+    - spec
+  instruction: |
+    ALTO: este es un cambio de comprensión/documentación. NO hay NADA que
+    implementar aquí.
+
+    Los entregables SON los artefactos: scope.md, walkthrough.md y las
+    specs/**/*.md que documentan el comportamiento actual. Ya fueron producidos
+    por las fases anteriores.
+
+    NO debes editar, crear ni borrar ningún archivo de código fuente como parte de
+    este cambio. Sin cambios de código, sin refactors. Los únicos archivos que este
+    cambio puede escribir son sus propios artefactos dentro de la carpeta del cambio.
+
+    Próximos pasos para el usuario (NO los hagas automáticamente):
+
+    - Para registrar estas specs como la línea base canónica, archiva el cambio
+      ('openspec archive <change-id>'), que fusiona los requisitos ADDED en
+      openspec/specs/.
+
+    - Para CAMBIAR comportamiento, crea un cambio APARTE con el schema
+      migracion-incremental que haga delta contra estas specs.
+
+    Confirma que los tres artefactos están completos y devuelve el control al
+    usuario. No escribas código.

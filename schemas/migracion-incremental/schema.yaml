@@ -1,0 +1,141 @@
+name: migracion-incremental
+version: 1
+description: >
+  Flujo para ejecutar UN salto de versión mayor de una migración (p. ej. Angular
+  16 -> 17, o .NET 6 -> 8). Produce plan.md (plan del salto) -> tasks.md (checklist
+  ejecutable). La fase apply ejecuta las tareas (ng update / dotnet, actualización
+  de dependencias) y verifica PARIDAD contra las specs de comportamiento producidas
+  por el schema research, registrando notas en notas-migracion.md. Un salto = un
+  cambio = una rama (ver la regla 'convencion-ramas' del MCP).
+  IMPORTANTE: TODOS los artefactos se redactan en ESPAÑOL.
+artifacts:
+  - id: plan
+    generates: plan.md
+    description: Plan del salto de versión
+    template: plan.md
+    instruction: >
+      Crea el plan de ESTE salto de versión. Redacta TODO en español.
+
+
+      Antes de escribir, consulta el MCP IAFIT:
+      - get_rule(category="migration", slug="proceso-migracion") y
+      get_rule(category="migration", slug="convencion-ramas").
+      - La regla del salto concreto (p. ej. 'angular-a-17'). Si su estado es
+      `draft` ("por verificar"), primero complétala desde la fuente oficial
+      (p. ej. update.angular.dev) y NO inventes datos.
+
+
+      Secciones:
+
+      - **Salto**: origen → destino y componente.
+
+      - **Rama**: nombre según 'convencion-ramas'. Indica de qué rama parte.
+
+      - **Baselines a preparar**: versión de Node/TS o .NET SDK requerida ANTES de
+      actualizar.
+
+      - **Comandos de actualización**: p. ej. `ng update @angular/core@N
+      @angular/cli@N`, schematics, o los pasos .NET equivalentes.
+
+      - **Dependencias del ecosistema**: librerías que suben con este salto
+      (Angular Material, RxJS, paquetes NuGet, librerías propias de la empresa).
+
+      - **Breaking changes a atender**: los de la regla del salto que aplican a
+      ESTE proyecto (según inventario.md).
+
+      - **Estrategia de verificación de paridad**: contra qué specs de research se
+      comprobará que el comportamiento no cambió.
+
+      - **Riesgos y plan de reversión**: qué puede salir mal y cómo volver atrás
+      (la rama aislada del salto es la reversión natural).
+    requires: []
+  - id: tasks
+    generates: tasks.md
+    description: Checklist ejecutable del salto
+    template: tasks.md
+    instruction: >
+      Crea la lista de tareas que descompone la ejecución del salto. Redacta TODO
+      en español.
+
+
+      **IMPORTANTE: sigue el formato de la plantilla exactamente.** La fase apply
+      parsea el formato de checkbox para seguir el progreso. Las tareas que no usen
+      `- [ ]` no se rastrean.
+
+
+      Guía:
+
+      - Agrupa tareas relacionadas bajo encabezados ## numerados.
+
+      - Cada tarea DEBE ser un checkbox: `- [ ] X.Y Descripción de la tarea`.
+
+      - Ordena por dependencia (¿qué debe ir primero? Preparar baselines antes de
+      `ng update`).
+
+      - Incluye SIEMPRE, cerca del final, una tarea de **verificación de paridad**
+      contra las specs de research y una de **build + pruebas verdes**.
+
+      - Incluye al final una tarea de **documentación del API** (README actualizado y
+      Swagger/OpenAPI; implementarlo si no existe) — ver la regla
+      'documentacion-api-cierre'. Es solo documentación, en su propio commit.
+
+
+      Ejemplo de orden: preparar Node/SDK → crear rama → ng update/schematics →
+      actualizar dependencias del ecosistema → revisión manual de breaking changes
+      → build + pruebas → verificación de paridad → commit/PR.
+
+
+      CONTROL-STOP tras escribir tasks.md. NO comiences la implementación ni pases
+      a la fase apply por tu cuenta. Crear tasks.md TERMINA este paso. La fase de
+      apply/implementación la dispara EXPLÍCITAMENTE el usuario (p. ej.
+      '/opsx:apply'); nunca es una continuación automática.
+    requires:
+      - plan
+apply:
+  requires:
+    - tasks
+  tracks: tasks.md
+  instruction: |
+    PUERTA — lee antes de hacer nada:
+    No empieces a aplicar como continuación automática de haber escrito tasks.md.
+    Continúa SÓLO si el usuario pidió explícitamente aplicar/implementar ESTE
+    cambio en este turno. Si llegaste aquí justo después de generar tasks.md,
+    DETENTE y pide confirmación.
+
+    Ejecuta el salto trabajando tasks.md, y redacta TODO en español.
+
+    1) Prepara y ejecuta
+    - Lee plan.md, tasks.md y el inventario/ruta si existen.
+    - Asegura primero los baselines (Node/TS o .NET SDK) del destino.
+    - Ejecuta los comandos de actualización (ng update / dotnet) y los schematics.
+    - Actualiza dependencias del ecosistema y atiende los breaking changes.
+    - Marca cada tarea "- [x]" a medida que avanzas. Detente ante bloqueadores.
+
+    2) Verifica PARIDAD
+    - Compila y corre las pruebas: deben quedar verdes.
+    - Comprueba el comportamiento contra las specs producidas por research. Si algo
+      cambió, decide si es esperado por el salto o una regresión a corregir.
+
+    3) Mantén un registro continuo en:
+    openspec/changes/<change-id>/notas-migracion.md
+    Créalo en la primera entrada (no esperes al final). Registra lo que un
+    mantenedor futuro deba saber y NO esté ya en plan.md:
+    - decisiones no cubiertas por el plan
+    - cambios respecto de lo que el plan asumía
+    - trade-offs y por qué
+    - supuestos, sorpresas, trabajo diferido, seguimientos
+    - resultado de la verificación de paridad (qué se comprobó y contra qué spec)
+
+    4) Documentación del API (cierre)
+    - Tras verificar paridad, revisa que el API quede bien documentado (regla
+      'documentacion-api-cierre'): README del API actualizado y Swagger/OpenAPI
+      presente. Si el API NO tiene Swagger, impleméntalo según el stack
+      (Swashbuckle en .NET <=8; Microsoft.AspNetCore.OpenApi en .NET 9/10;
+      extensión OpenAPI de Functions si es Azure Functions).
+    - Es SOLO documentación (expone el contrato existente, no cambia comportamiento):
+      hazlo en su PROPIO commit, verifica que build y paridad siguen verdes, y no
+      expongas datos sensibles ni endpoints internos sin protección.
+
+    Implementa UN grupo de tareas (por encabezado) a la vez y haz pausa para
+    revisión entre grupos. Al terminar, deja el salto listo para commit/PR de su
+    rama.

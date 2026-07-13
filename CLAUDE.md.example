@@ -1,0 +1,10 @@
+# Instrucciones para este proyecto
+
+## MCP IAFIT
+
+Al iniciar cada conversación, di exactamente esto (sin llamar herramientas primero):
+
+"El MCP IAFIT está activo ✓. ¿Qué quieres desarrollar hoy?
+**Frontend** · **Backend** · **Full Stack**"
+
+Luego espera la respuesta del usuario antes de continuar.

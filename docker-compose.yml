@@ -1,0 +1,18 @@
+# docker-compose.yml — referencia para pruebas manuales fuera de Claude Code
+# Uso: docker compose up
+# Para uso con Claude Code usa .mcp.json directamente (ver DESIGN.md sección 4).
+services:
+  iafit:
+    image: iafit-mcp:latest
+    build: .
+    stdin_open: true
+    hostname: iafit
+    ports:
+      - "3456:3456"
+    volumes:
+      - iafit-tokens:/root/.iafit
+    env_file:
+      - .env
+
+volumes:
+  iafit-tokens:

@@ -1,0 +1,142 @@
+name: inventario-tecnico
+version: 1
+description: >
+  Flujo SOLO-LECTURA para capturar el estado técnico actual de un proyecto antes de
+  migrarlo. Produce estado-ramas.md (comparación dev vs master: qué hay liberado y qué
+  falta) -> inventario.md (framework y versión, paquetes y versiones,
+  dependencias deprecadas/EOL, pipeline de build y pruebas, bloqueadores) ->
+  ruta.md (la secuencia de saltos de versión recomendada, con nombre de rama y
+  riesgos por salto). NO edita código. Es la fase 1 del proceso de migración; su
+  salida alimenta al schema migracion-incremental.
+  IMPORTANTE: TODOS los artefactos se redactan en ESPAÑOL.
+artifacts:
+  - id: estado-ramas
+    generates: estado-ramas.md
+    description: Comparación de ramas dev vs master antes de migrar (fase 0)
+    template: estado-ramas.md
+    instruction: >
+      LO PRIMERO del proceso. Compara la rama de desarrollo (`dev`) contra la
+      liberada (`master`/`main`) y documenta el estado, SOLO con git (no edites
+      nada). Redacta TODO en español, puntual y sin extenderte.
+
+
+      Detecta primero los nombres reales de las ramas (`git branch -a`); pueden ser
+      `dev`/`develop`/`desarrollo` y `master`/`main`.
+
+
+      Comandos de referencia (solo lectura):
+
+      - `git fetch --all`
+
+      - `git log --oneline --left-right --cherry-pick master...dev` (qué falta en cada lado)
+
+      - `git rev-list --left-right --count master...dev` (conteo ahead/behind)
+
+
+      Documenta de forma explícita pero breve:
+
+      - Qué está **liberado** (en master) y qué **falta por liberar** (en dev).
+
+      - Si las ramas **divergen** y el riesgo de conflicto.
+
+      - Desde qué rama se **parte para migrar** (normalmente dev) y qué hay que
+      resolver antes de arrancar (p. ej. un merge pendiente).
+
+
+      No propongas cambios ni hagas merges; esto es un diagnóstico de arranque.
+    requires: []
+  - id: inventario
+    generates: inventario.md
+    description: Estado técnico actual del proyecto
+    template: inventario.md
+    instruction: >
+      Documenta el ESTADO ACTUAL del proyecto leyendo los archivos de configuración
+      y manifiestos (NO edites nada). Redacta TODO en español.
+
+
+      Fuentes a leer según el stack:
+
+      - Frontend Angular: package.json, package-lock.json/yarn.lock, angular.json,
+      tsconfig*.json, .nvmrc, azure-pipelines.yml, README existente.
+
+      - Backend .NET: *.csproj, *.sln, Directory.Build.props, global.json,
+      nuget.config, appsettings*.json, Dockerfile, azure-pipelines.yml.
+
+
+      Secciones (rellena sólo lo que puedas evidenciar desde archivos):
+
+      - **Framework y versión actual**: versión exacta detectada y de dónde se leyó.
+
+      - **Runtime/SDK**: versión de Node/TypeScript o de .NET SDK/TFM
+      (`TargetFramework`).
+
+      - **Dependencias**: tabla de paquetes relevantes con su versión actual.
+      Marca las que estén **deprecadas**, **sin mantenimiento** o **EOL**.
+
+      - **Pipeline de build y pruebas**: cómo se compila y se prueba hoy
+      (comandos, CI). ¿Hay pruebas? ¿Cobertura conocida?
+
+      - **Bloqueadores conocidos**: cosas que probablemente compliquen la migración
+      (APIs deprecadas en uso, librerías propias, código generado, etc.).
+
+      - **Objetivo de migración**: versión destino deseada (según lo indicado en el
+      onboarding).
+
+
+      Cada dato debe citar el archivo del que proviene. Si algo no se puede
+      determinar desde archivos, decláralo como "por confirmar" en vez de adivinar.
+    requires:
+      - estado-ramas
+  - id: ruta
+    generates: ruta.md
+    description: Ruta de actualización por saltos, con ramas y riesgos
+    template: ruta.md
+    instruction: >
+      A partir de inventario.md, define la RUTA de actualización: la secuencia de
+      saltos de versión mayor desde la versión actual hasta el objetivo, respetando
+      que se avanza una versión a la vez. Redacta TODO en español.
+
+
+      Consulta las reglas del MCP IAFIT para cada salto:
+      - list_rules(category="migration") y get_rule para la convención de ramas
+      ('convencion-ramas'), el proceso ('proceso-migracion') y la regla de cada
+      salto (p. ej. 'angular-a-15').
+
+
+      Para cada salto de la ruta indica:
+
+      - **Origen → destino** (p. ej. 14 → 15).
+
+      - **Nombre de rama** sugerido según 'convencion-ramas'
+      (migration/<componente>-<framework>-<versión>).
+
+      - **Baselines** de runtime requeridos (Node/TS o .NET SDK).
+
+      - **Riesgos/breaking del salto** (resumidos desde la regla correspondiente).
+
+      - **Estado de la regla**: si la regla del MCP para ese salto está en `draft`
+      ("por verificar"), márcalo para completarla desde la fuente oficial antes de
+      ejecutar.
+
+
+      NO ejecutes la migración aquí. Esto es sólo el plan de la ruta.
+    requires:
+      - inventario
+apply:
+  requires:
+    - ruta
+  instruction: |
+    ALTO: este es un cambio SOLO-LECTURA de inventario. NO hay NADA que implementar.
+
+    Los entregables SON los artefactos: inventario.md y ruta.md. NO edites, crees ni
+    borres código fuente.
+
+    Próximos pasos para el usuario (NO los hagas automáticamente):
+
+    - Archivar este cambio para conservar el inventario y la ruta como referencia.
+
+    - Iniciar la migración real creando un cambio con el schema migracion-incremental
+      por CADA salto de la ruta, cada uno en su propia rama (ver 'convencion-ramas').
+
+    Confirma que inventario.md y ruta.md están completos y devuelve el control al
+    usuario.

@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Copy-Item \"C:\\\\Repos\\\\iafit\\\\.env.example\" \"C:\\\\Repos\\\\iafit\\\\.env\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Repos\\iafit"
+    ]
+  }
+}
