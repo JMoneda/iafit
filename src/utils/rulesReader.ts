@@ -50,7 +50,8 @@ export interface RuleFrontmatter {
   version?: string;
   last_updated?: string;
   applies_to?: string[];
-  status?: 'active' | 'deprecated' | 'draft';
+  /** `superseded`: reemplazada por otra regla/ADR (vocabulario estándar de ADRs). */
+  status?: 'active' | 'deprecated' | 'draft' | 'superseded';
 }
 
 export interface RuleEntry {

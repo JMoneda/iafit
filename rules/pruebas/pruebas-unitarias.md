@@ -43,3 +43,27 @@ vulnerabilidades avance a QA/Prod.
 - Cada caso de uso nuevo llega con sus pruebas; no se acepta lógica de negocio sin cubrir.
 - Los proyectos de test siguen la estructura `tests/<Producto>.<Capa>.UnitTests`
   (ver [[clean-architecture-dotnet]]).
+- **Ninguna prueba omitida** (`[Fact(Skip=...)]`, `[Ignore]`) en la rama principal: una prueba
+  omitida es una prueba que no existe.
+- **Durante una migración, las pruebas no se debilitan** para poner el salto en verde, y el
+  umbral de cobertura no baja (ver [[pruebas-son-linea-base]]).
+- El equivalente de esta regla para el frontend Angular es [[pruebas-frontend-angular]].
+
+## Verificación
+
+```bash
+# 1. Las pruebas corren y pasan, con cobertura
+dotnet test --collect:"XPlat Code Coverage"
+
+# 2. Pruebas omitidas en la rama principal (debe salir vacío)
+grep -rnE "Skip\s*=|\[Ignore" --include=*.cs tests/
+
+# 3. Toda capa de negocio tiene su proyecto de pruebas
+ls tests/
+
+# 4. El gate de SonarQube está en el pipeline y bloquea (no solo reporta)
+grep -rniE "sonar|coverage" azure-pipelines*.yml .azuredevops/ 2>/dev/null
+```
+
+**Criterio de aceptación:** el comando 1 termina en 0; el 2 sale vacío; el gate del 4 está
+configurado para **fallar** el pipeline, no para publicar el reporte y seguir.

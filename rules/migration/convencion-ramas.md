@@ -60,3 +60,29 @@ arrastrar los cambios de otros saltos. Es también la política de la empresa
   dev
    └─ migration/controls-angular-17   (12 → 17 de golpe)
 ```
+
+El salto grande no es solo "menos revisable": **ningún schematic intermedio corre**. Todas las
+migraciones automáticas que traían las versiones saltadas quedan sin ejecutar, y hay que
+barrerlas a mano (ver [[residuos-de-migracion]]). Es exactamente lo que le pasó a
+`@shared/pipes` al ir de 12 a 17 en un commit.
+
+## Verificación
+
+```bash
+# 1. Existe una rama por versión de la cadena
+git branch -a --list '*migration*'
+
+# 2. La rama actual sube UN solo major (revisar el diff del package.json / .csproj)
+git diff <rama-padre>..HEAD -- package.json | grep -E '^[+-].*"@angular/core"'
+git diff <rama-padre>..HEAD -- '*.csproj' | grep -E '^[+-].*TargetFramework'
+
+# 3. La rama parte de la del salto anterior, no de dev/main (una vez iniciada la cadena)
+git merge-base --is-ancestor <rama-salto-anterior> HEAD && echo "OK: encadenada"
+
+# 4. El nombre sigue el patrón migration/<componente>-<framework>-<versión>
+git rev-parse --abbrev-ref HEAD
+```
+
+**Criterio de aceptación:** el comando 2 muestra un salto de **una sola versión mayor**. Si
+muestra varios, es un salto múltiple: ver la sección de deuda de saltos omitidos en
+[[proceso-migracion]].

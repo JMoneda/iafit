@@ -24,6 +24,9 @@ deprecadas por su **equivalente exacto**. El sistema debe seguir operando **tal 
 - **Contratos públicos**: firmas de API, formatos de mensaje/evento, esquemas de datos,
   nombres y semántica de campos.
 - **Comportamiento observable**: mismas entradas → mismas salidas y efectos.
+- **Las pruebas existentes**: son la red de seguridad, no un obstáculo del build. No se
+  debilitan sus asertos, ni se borran, ni se omiten para poner el salto en verde
+  (ver [[pruebas-son-linea-base]]).
 
 **Permitido (y esperado)** siempre que el comportamiento observable sea idéntico:
 
@@ -31,6 +34,10 @@ deprecadas por su **equivalente exacto**. El sistema debe seguir operando **tal 
 - Cambiar hosting model, TFM, paquetes y herramientas de build.
 - Ajustes mecánicos que la nueva versión exige (p. ej. cómo se lee la configuración en el
   modelo isolated), siempre que **resuelvan a los mismos valores y destinos**.
+- **Adaptar la sintaxis de una prueba** cuando el compilador nuevo no la acepta (p. ej.
+  castear `null` bajo `strict`), conservando **intacta la aserción**.
+- **Eliminar configuración muerta** que la versión destino ya no usa: no altera
+  comportamiento (ver [[residuos-de-migracion]]).
 
 ## Justificación
 
@@ -67,4 +74,26 @@ distintas** que no comparten rama.
   - "Ya que subo a .NET 8, cambio la cola de Storage a Service Bus."
   - "Aprovecho y corrijo esta regla de negocio que estaba mal."
   - "Apunto la conexión a la nueva base mientras migro."
+  - "El test no compila con `strict`, le cambio el `expect` para que pase."
+    → El comportamiento sigue ahí; lo único que se eliminó es la evidencia.
 ```
+
+## Verificación
+
+```bash
+# 1. El diff del salto NO debe tocar lógica de negocio ni conexiones.
+#    Revisar uno por uno los archivos que no sean config, dependencias o sintaxis deprecada:
+git diff <rama-base>..HEAD --stat
+
+# 2. Conexiones, endpoints y cadenas: mismos valores y destinos (debe salir vacío)
+git diff <rama-base>..HEAD -- '*appsettings*.json' '*environment*.ts' '*.config' \
+  | grep -E '^[+-].*(ConnectionString|Endpoint|Uri|Url|Host|Queue|Topic|Database)'
+
+# 3. Las pruebas conservan sus asertos (ver 'pruebas-son-linea-base')
+git diff <rama-base>..HEAD -- '*.spec.ts' '*Tests.cs' | grep -E '^\-.*(expect\(|Assert\.)'
+
+# 4. Paridad contra las specs de research: build + pruebas verdes y comportamiento igual
+```
+
+**Criterio de aceptación:** los comandos 2 y 3 salen vacíos. Cualquier resultado es un cambio
+de comportamiento y debe justificarse con el usuario o revertirse.

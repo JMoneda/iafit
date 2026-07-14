@@ -10,7 +10,11 @@ description: Reglas y matrices para migrar/actualizar proyectos entre versiones 
 | convencion-ramas | Convención de ramas por versión | frontend, backend |
 | proceso-migracion | Proceso de migración incremental (OpenSpec) | frontend, backend |
 | preservar-comportamiento | Actualizar sin alterar comportamiento ni conexiones | frontend, backend |
+| pruebas-son-linea-base | Las pruebas son línea base: no se debilitan para que pasen | frontend, backend |
 | linea-base-compila | La línea base debe compilar antes de migrar | frontend, backend |
+| residuos-de-migracion | No dejar configuración a medio migrar (residuos) | frontend, backend |
+| alineacion-ecosistema | Los majors del ecosistema siguen al del framework | frontend, backend |
+| librerias-publicadas | Migrar una librería publicada: el manifiesto es el contrato | frontend, libreria |
 | documentacion-walkthrough | Documentación con snippets ejecutados (Showboat) | frontend, backend |
 | sugerencias-post-migracion | Sugerencias de refactor y hallazgos al cerrar la migración | frontend, backend |
 | documentacion-api-cierre | Documentar el API al cerrar el apply (README + Swagger/OpenAPI) | backend |

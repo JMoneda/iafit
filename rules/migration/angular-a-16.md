@@ -33,8 +33,40 @@ Fuente de verdad: `https://update.angular.dev/?v=15.0-16.0`.
 - Oportunidad de empezar a introducir signals en estado local (no obligatorio).
 - Revisar suscripciones manuales que puedan pasar a `takeUntilDestroyed`.
 
+⚠️ Signals y `takeUntilDestroyed` **son mejoras, no parte del salto**: cambian el modelo de
+ejecución. Se anotan como hallazgo ([[sugerencias-post-migracion]]) y se abordan en un change
+separado (ver [[preservar-comportamiento]]).
+
+## Ecosistema (majors que suben con este salto)
+
+Ver [[alineacion-ecosistema]]: `@angular/cli`, `@angular-devkit/build-angular`,
+`@angular/material`/`cdk`, `ng-packagr` y `@angular-eslint/*` van a 16. `typescript` al
+rango que exige 16 (**4.9/5.0**).
+
+## Residuos a eliminar en este salto
+
+Ver [[residuos-de-migracion]]:
+
+- **`ngcc` desaparece**: cualquier referencia (scripts `postinstall` con `ngcc`,
+  `enableIvy` en `tsconfig`) es residuo y se elimina.
+- `angular.json` → `defaultProject` ya no lo usa el CLI.
+- Si vienes de un salto donde se creó `polyfills.ts`/`test.ts` a mano, es el momento de
+  cerrarlo: la config correcta es el arreglo `"polyfills"` en `angular.json`.
+
 ## Comando
 
-```
+```bash
 ng update @angular/core@16 @angular/cli@16
+```
+
+## Verificación
+
+```bash
+# Residuos del salto (deben salir vacíos)
+grep -rn "ngcc\|enableIvy" package.json tsconfig.json angular.json 2>/dev/null
+grep -nE '"defaultProject"' angular.json
+ls src/polyfills.ts src/test.ts projects/*/src/polyfills.ts projects/*/src/test.ts 2>/dev/null
+
+npm ls @angular/core @angular/cli @angular-eslint/eslint-plugin typescript --depth=0
+ng build && ng test --watch=false --browsers=ChromeHeadless
 ```

@@ -52,3 +52,26 @@ Log Analytics habilita consultas KQL, dashboards y alertas.
   acciones frecuentes).
 - Los errores de negocio (`AplicationCoreException`) se registran con su contexto
   (ver [[dotnet]]).
+
+## Verificación
+
+```bash
+# 1. Application Insights está configurado (backend y frontend)
+grep -rniE "applicationinsights|ApplicationInsights" --include=*.csproj --include=*.json \
+  --include=*.ts . --exclude-dir=node_modules | head
+
+# 2. Errores tragados en silencio: catch sin log (revisar cada resultado)
+grep -rn -A2 "catch" --include=*.cs --include=*.ts src/ | grep -B1 "^\s*}" | head
+
+# 3. Información personal en logs (debe salir vacío)
+grep -rniE "log.*(cedula|documento|correo|email|telefono|nombre|password)" \
+  --include=*.cs --include=*.ts src/
+
+# 4. Trazas sin estructura: console.log / Console.WriteLine en producción (debe salir vacío)
+grep -rn "console\.log\|Console.WriteLine" --include=*.ts --include=*.cs src/ \
+  | grep -v ".spec.ts"
+```
+
+**Criterio de aceptación:** el comando 1 encuentra la instrumentación en backend **y**
+frontend; los comandos 3 y 4 salen vacíos; todo `catch` del 2 registra el error con su
+contexto.

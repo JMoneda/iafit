@@ -59,3 +59,28 @@ env:
 env:
   API_KEY: sk_live_abc123xyz
 ```
+
+## Verificación
+
+```bash
+# 1. Secretos hardcodeados en el árbol de trabajo (debe salir vacío)
+git grep -nE "(password|passwd|api[_-]?key|secret|token|connectionstring)\s*[:=]\s*['\"][^'\"]{8,}" \
+  -- ':!*.md' ':!*.example' ':!package-lock.json'
+
+# 2. Patrones de credenciales reales (claves de Azure, SAS, PAT, conexiones SQL)
+git grep -nE "(AccountKey=|SharedAccessSignature|sk_live_|Server=.*Password=)" -- ':!*.md'
+
+# 3. Archivos que nunca deben estar versionados (debe salir vacío)
+git ls-files | grep -E "^\.env$|\.env\.(local|dev|prod)$|\.pfx$|\.pem$|\.publishsettings$"
+
+# 4. .env ignorado de verdad
+grep -n "^\.env" .gitignore
+
+# 5. El secreto ya filtrado sigue en el HISTORIAL aunque se haya borrado en un commit
+git log --all --full-history -- .env
+git grep -nE "sk_live_|AccountKey=" $(git rev-list --all) 2>/dev/null | head
+```
+
+**Criterio de aceptación:** los comandos 1, 2 y 3 salen vacíos. Si el 5 devuelve algo, el
+secreto está **comprometido**: se revoca y rota de inmediato — borrarlo del working tree no
+lo saca del historial.

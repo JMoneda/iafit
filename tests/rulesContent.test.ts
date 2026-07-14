@@ -13,7 +13,7 @@ import matter from 'gray-matter';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RULES_DIR = path.join(__dirname, '..', 'rules');
 
-const STATUS_VALIDOS = ['active', 'deprecated', 'draft'];
+const STATUS_VALIDOS = ['active', 'deprecated', 'draft', 'superseded'];
 
 function categoriasExistentes(): string[] {
   return fs

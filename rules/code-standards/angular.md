@@ -41,3 +41,39 @@ TypeScript (ver [[typescript]]).
   }
 }
 ```
+
+## Código heredado: se anota, no se corrige de paso
+
+Estos estándares aplican a **código nuevo**. Un proyecto que llega a migrarse suele estar
+lleno de `any` y de firmas sin tipar (`transform(input: any, fn: Function): any`). Eso
+**no se corrige durante la migración**: tipar cambia comportamiento y contamina el salto
+(ver [[preservar-comportamiento]]).
+
+Se registra como hallazgo en `sugerencias-refactor.md` y se aborda en un change separado
+(ver [[sugerencias-post-migracion]]). Lo que **sí** exige la migración es que activar `strict`
+no sirva de excusa para debilitar las pruebas (ver [[pruebas-son-linea-base]]).
+
+## Verificación
+
+```bash
+# 1. strict activo y sin excepciones locales
+grep -nE '"(strict|noImplicitReturns|noFallthroughCasesInSwitch)"' tsconfig.json
+
+# 2. `any` explícito y escapes del compilador (en código NUEVO deben salir vacíos;
+#    en código heredado, cada resultado va a sugerencias-refactor.md)
+grep -rnE ":\s*any\b|\bas any\b" --include=*.ts src/ projects/ | grep -v ".spec.ts"
+grep -rn "@ts-ignore\|@ts-nocheck" --include=*.ts src/ projects/
+
+# 3. HTTP fuera de servicios (los componentes no llaman al gateway directamente)
+grep -rln "HttpClient" --include=*.component.ts src/ projects/
+
+# 4. URLs hard-coded en vez de configuración de entorno (debe salir vacío)
+grep -rnE "https?://" --include=*.ts src/ projects/ | grep -v "environment\|.spec.ts"
+
+# 5. Compila y lintea limpio
+ng build && ng lint
+```
+
+**Criterio de aceptación:** el comando 1 muestra `strict: true`; los comandos 3 y 4 salen
+vacíos; el 5 termina sin errores ni warnings. Los resultados del 2 en código heredado están
+inventariados como hallazgos, no corregidos dentro del salto.

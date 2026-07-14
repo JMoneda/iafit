@@ -59,3 +59,39 @@ intención, priorizados y auditables, sin contaminar la migración.
 - **<hallazgo>** · Beneficio: <cuál> · Prioridad: <...> · Esfuerzo: <...>
   → Propuesta: <cambio sugerido en change separado>
 ```
+
+## Dónde mirar (una migración siempre deja hallazgos)
+
+Un `sugerencias-refactor.md` vacío casi siempre significa que **no se buscó**, no que el
+proyecto esté limpio. Barrido mínimo antes de dar por cerrada la migración:
+
+- **Código heredado sin tipar**: `any` explícito, firmas públicas sin tipo
+  (ver [[angular]], [[typescript]]).
+- **Puentes temporales que quedaron puestos**: `UntypedFormGroup`, `mat-legacy-*`,
+  `--legacy-peer-deps`. Funcionan, y por eso nadie los quita.
+- **Dependencias no declaradas o no tree-shakeables** en librerías publicadas
+  (ver [[librerias-publicadas]]).
+- **Cobertura y umbrales simbólicos** (ver [[pruebas-frontend-angular]]).
+- **Modernización disponible y no aplicada**: standalone components/pipes, signals,
+  `takeUntilDestroyed`, control flow (`@if`/`@for`). Son mejoras, **no** parte del salto.
+- **Residuos que no se pudieron eliminar** y por qué (ver [[residuos-de-migracion]]).
+
+## Verificación
+
+```bash
+# 1. El entregable existe y no está vacío
+test -s openspec/changes/<change-id>/sugerencias-refactor.md && echo "OK"
+
+# 2. Los hallazgos anotados durante los saltos llegaron al consolidado
+grep -rn "sugerencia\|hallazgo\|diferid" openspec/changes/*/notas-migracion.md
+
+# 3. Cada vulnerabilidad tiene su HU en Azure DevOps (tool create_work_item)
+grep -nE "HU sugerida|#[0-9]+" openspec/changes/<change-id>/sugerencias-refactor.md
+
+# 4. Nada de esto se implementó dentro de la migración (debe salir vacío):
+#    el cierre es SOLO documentación
+git diff <rama-base>..HEAD --stat -- ':!*.md'
+```
+
+**Criterio de aceptación:** el comando 1 pasa; toda vulnerabilidad del 3 tiene HU creada o
+marcada "por crear"; el comando 4 no muestra cambios de código en el commit de cierre.

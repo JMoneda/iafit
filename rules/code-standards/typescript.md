@@ -47,3 +47,21 @@ export function parsearEdad(valor: any): any {
   return valor;
 }
 ```
+
+## Verificación
+
+```bash
+# 1. Flags obligatorios del compilador
+grep -nE '"(strict|noUncheckedIndexedAccess|noImplicitReturns)"' tsconfig.json
+
+# 2. `any` explícito y escapes del compilador (debe salir vacío en código nuevo)
+grep -rnE ":\s*any\b|\bas any\b|<any>" --include=*.ts src/
+grep -rn "@ts-ignore\|@ts-nocheck\|eslint-disable" --include=*.ts src/
+
+# 3. Compila y lintea sin errores NI warnings
+npx tsc --noEmit
+npx eslint . --max-warnings=0
+```
+
+**Criterio de aceptación:** el comando 2 sale vacío (en código heredado, cada resultado se
+inventaría como hallazgo, no se corrige dentro de una migración); el 3 termina en 0.

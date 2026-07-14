@@ -56,3 +56,33 @@ La línea base que compila es el punto de referencia de toda la migración.
   - `dotnet build` falla: paquete X 2.1.0 no restaura (feed privado caído).
     Decisión con usuario: arreglar en cambio separado antes de migrar.
 ```
+
+## La línea base incluye las pruebas
+
+Compilar no basta: la línea base es **build verde + pruebas verdes**. Si las pruebas no pasan
+antes de migrar, no hay con qué comparar después, y el salto tendrá coartada para debilitarlas
+("ya venían fallando"). Se registra el **conteo de pruebas** y el **porcentaje de cobertura**
+de la base: son las cifras contra las que se verifica el salto (ver [[pruebas-son-linea-base]]).
+
+## Verificación
+
+```bash
+# 1. Build de la línea base, sin tocar nada (solo lectura)
+npm ci && npm run build          # frontend
+dotnet build -c Release          # backend
+
+# 2. Pruebas de la línea base: resultado, CONTEO y cobertura (se anotan en inventario.md)
+ng test --watch=false --browsers=ChromeHeadless --code-coverage
+dotnet test --collect:"XPlat Code Coverage"
+
+# 3. Versión exacta del toolchain usado (parte del registro)
+node -v && npm -v
+dotnet --version
+
+# 4. El working tree quedó intacto: verificar es solo lectura (debe salir vacío)
+git status --porcelain
+```
+
+**Criterio de aceptación:** `inventario.md` registra, en la sección "Compilación de línea
+base", el comando exacto, el resultado (✅/❌), la versión del toolchain, el **número de
+pruebas** y la **cobertura**. El comando 4 sale vacío.

@@ -50,10 +50,39 @@ saltos pequeños y verificables hace la migración auditable y reversible.
 - **No se implementa nada en las fases 1 y 2.** Son read-only (documentación).
 - **Cada salto verifica contra las specs de `research`** antes de continuar al
   siguiente.
+- **Las pruebas existentes son línea base**: no se debilitan para que el salto quede verde
+  (ver [[pruebas-son-linea-base]]).
+- **Cada salto cierra sin residuos**: la configuración de la versión anterior se elimina en
+  ese mismo salto (ver [[residuos-de-migracion]]) y el ecosistema queda alineado al major
+  destino (ver [[alineacion-ecosistema]]).
+- **Si el componente es una librería publicada**, el manifiesto que se publica es parte del
+  contrato y se verifica en cada salto (ver [[librerias-publicadas]]).
 - **El README final se deriva** de las specs y walkthroughs acumulados, no se
-  redacta a mano desde cero.
+  redacta a mano desde cero. El README boilerplate del CLI (`ng serve`, `ng e2e`) **no es
+  documentación**: si sigue ahí al cerrar, la fase 5 no se hizo.
 - **El orden no se salta.** Si no hay inventario ni research, no se inicia la
   migración incremental.
+
+## Cuando el repo ya sufrió un salto múltiple
+
+Muchos proyectos llegan con la cadena rota: alguien subió de v12 a v17 en un solo commit. Eso
+**no se deshace**, pero sí se detecta y se paga, porque **ningún schematic intermedio corrió**
+y toda migración automática que esos saltos traían quedó sin ejecutar.
+
+Al detectarlo en la fase 1 (inventario), se documenta como **deuda de saltos omitidos** y se
+inventaría lo que los schematics habrían hecho:
+
+- Configuración que quedó en el formato de la versión vieja ([[residuos-de-migracion]]).
+- Paquetes del ecosistema que `ng update` no tocó ([[alineacion-ecosistema]]).
+- Pruebas que se debilitaron para que el salto compilara ([[pruebas-son-linea-base]]).
+- APIs deprecadas que cada versión intermedia habría migrado automáticamente.
+
+Señales de que ocurrió: un solo commit con el `package-lock.json` regenerado entero; el
+`package.json` salta varios majors de golpe; el historial no tiene una rama por versión
+([[convencion-ramas]]).
+
+**No se "re-migra" hacia atrás.** Se levanta el inventario del estado real, se sanea como
+trabajo explícito y **desde ahí** se reanuda la cadena de saltos, uno a uno.
 
 ## Relación con el onboarding
 
@@ -61,3 +90,23 @@ Cuando el MCP arranca en un proyecto sin configurar, la entrevista de onboarding
 pregunta: ¿actualizar?, ¿qué?, ¿crear rama?, ¿cómo llamarla?, ¿usar OpenSpec?,
 ¿instalarlo? Con las respuestas, configura los schemas de estas fases. El MCP
 entrega el plan y el contenido; **el agente ejecuta** git/npm y escribe los archivos.
+
+## Verificación
+
+```bash
+# 1. ¿El repo ya sufrió un salto múltiple? (commits que regeneran el lock entero)
+git log --oneline --stat -- package-lock.json | head -30
+git log -p --follow -- package.json | grep -E "^[+-].*\"@angular/core\"" | head
+
+# 2. ¿Existe una rama por versión, o se saltó la cadena?
+git branch -a --list '*migration*'
+
+# 3. El README final no puede ser el boilerplate del CLI (debe salir vacío)
+grep -lE "This project was generated with|Run \`ng serve\`" README.md
+
+# 4. Al cerrar el salto: build verde, pruebas verdes, paridad verificada
+```
+
+**Criterio de aceptación:** si el comando 1 revela un salto múltiple ya consumado, existe una
+sección de **deuda de saltos omitidos** en `inventario.md`. El comando 3 sale vacío antes de
+archivar la migración.
