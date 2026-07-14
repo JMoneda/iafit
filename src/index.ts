@@ -75,6 +75,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
   if (!handler) {
     return {
+      isError: true,
       content: [
         {
           type: 'text',
@@ -91,6 +92,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     };
   } catch (err) {
     return {
+      isError: true,
       content: [
         {
           type: 'text',

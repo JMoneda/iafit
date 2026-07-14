@@ -1,0 +1,7 @@
+name: plegado
+version: 2.1.0
+description: >
+  Descripción en varias líneas
+  que debe concatenarse en una sola.
+phases:
+  - uno

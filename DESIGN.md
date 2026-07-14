@@ -6,12 +6,20 @@
 
 | Tool | Propósito |
 |------|-----------|
-| `list_rule_categories` | Lista las cuatro categorías disponibles con un resumen de cuántos archivos hay en cada una |
-| `list_rules` | Lista los archivos de una categoría (`architecture`, `code-standards`, `adrs`, `security`) con título y descripción breve |
+| `list_rule_categories` | Lista las categorías disponibles con un resumen de cuántos archivos hay en cada una |
+| `list_rules` | Lista los archivos de una categoría con título y descripción breve |
 | `get_rule` | Devuelve el contenido completo de un archivo de reglas por categoría y slug |
-| `search_rules` | Búsqueda por texto libre sobre todos los archivos de reglas — devuelve fragmentos relevantes con contexto |
+| `search_rules` | Búsqueda por texto libre (insensible a mayúsculas y acentos) sobre todos los archivos de reglas — devuelve fragmentos relevantes con contexto |
 
-Las cuatro categorías tienen exactamente el mismo peso: `architecture`, `code-standards`, `adrs`, `security`. No hay jerarquía entre ellas.
+Las categorías (todas con el mismo peso, sin jerarquía entre ellas) son: `architecture`,
+`code-standards`, `adrs`, `security`, `migration`, `observabilidad`, `pruebas`, `cicd`.
+
+### Grupo A-bis: Schemas de OpenSpec
+
+| Tool | Propósito |
+|------|-----------|
+| `list_schemas` | Lista los schemas de OpenSpec que IAFIT provee (nombre, versión, descripción) |
+| `get_schema` | Devuelve el `schema.yaml` y todas las plantillas de un schema, para instalarlo en el proyecto destino |
 
 ### Grupo B: Azure DevOps
 
@@ -32,6 +40,15 @@ Las cuatro categorías tienen exactamente el mismo peso: `architecture`, `code-s
 | `update_work_item` | Actualiza campos de un work item existente — requiere confirmación |
 | `add_pr_comment` | Agrega un comentario a un PR — requiere confirmación |
 
+### Prompts
+
+Además de las tools, IAFIT expone dos prompts MCP que orientan al agente:
+
+| Prompt | Propósito |
+|--------|-----------|
+| `iafit-inicio` | Saludo inicial — confirma que IAFIT está activo y orienta al usuario (desarrollar o migrar) |
+| `iafit-migracion` | Onboarding de migración — conduce la entrevista, configura schemas y arranca las fases en español |
+
 ---
 
 ## 2. Estructura del contenido de reglas
@@ -40,16 +57,28 @@ Las cuatro categorías tienen exactamente el mismo peso: `architecture`, `code-s
 rules/
 ├── architecture/
 │   ├── _index.md
-│   └── microservices.md
+│   └── *.md
 ├── code-standards/
 │   ├── _index.md
-│   └── typescript.md
+│   └── *.md
 ├── adrs/
 │   ├── _index.md
-│   └── 0001-use-postgres.md
-└── security/
+│   └── *.md
+├── security/
+│   ├── _index.md
+│   └── *.md
+├── migration/
+│   ├── _index.md
+│   └── *.md          # matrices angular-a-13..22, dotnet-a-5..10, azure-functions, y reglas de proceso
+├── observabilidad/
+│   ├── _index.md
+│   └── *.md
+├── pruebas/
+│   ├── _index.md
+│   └── *.md
+└── cicd/
     ├── _index.md
-    └── secrets-management.md
+    └── *.md
 ```
 
 ### Formato de cada archivo
@@ -76,6 +105,10 @@ status: active             # active | deprecated | draft
 El `_index.md` de cada categoría lista los slugs disponibles con título y resumen de una línea.
 El versionado es el historial de git — no hay sistema de versiones propio en el MVP.
 
+> La integridad de este contenido (frontmatter válido, `category` coincidente con la
+> carpeta, slug con formato `[a-z0-9-]`, `status` permitido, slugs únicos por categoría y
+> presencia de `_index.md`) está cubierta por la suite de pruebas (`tests/rulesContent.test.ts`).
+
 ---
 
 ## 3. Integración con Azure DevOps
@@ -96,15 +129,19 @@ API version: `7.1`
 | Actualizar work item | PATCH | `wit/workitems/{id}` (`application/json-patch+json`) |
 | Agregar comentario PR | POST | `git/repositories/{repo}/pullrequests/{prId}/threads` |
 
-### Autenticación: OAuth 2.0 Authorization Code + PKCE (Microsoft Entra ID)
+### Autenticación: PAT (Basic) u OAuth 2.0 + PKCE (Microsoft Entra ID)
 
-Variables de entorno requeridas:
-- `AZURE_AD_CLIENT_ID` — Client ID de la app registrada en Entra ID
-- `AZURE_AD_TENANT_ID` — Tenant ID del tenant de EAFIT
+IAFIT admite dos métodos (ver sección 7). Si `AZURE_DEVOPS_PAT` está definido, usa Basic
+auth con el PAT; si no, usa el flujo OAuth + PKCE contra Entra ID.
+
+Variables de entorno:
+- `AZURE_DEVOPS_PAT` — Personal Access Token (opcional; si está, tiene precedencia)
+- `AZURE_AD_CLIENT_ID` — Client ID de la app registrada en Entra ID (para OAuth)
+- `AZURE_AD_TENANT_ID` — Tenant ID del tenant de EAFIT (para OAuth)
 - `AZURE_DEVOPS_ORG` — `eafit-dinfo`
 - `AZURE_DEVOPS_PROJECT` — Proyecto por defecto
 
-#### Flujo al invocar una tool del Grupo B
+#### Flujo OAuth al invocar una tool del Grupo B (cuando no hay PAT)
 
 ```
 1. ¿Hay access token válido en disco (cifrado)?
@@ -137,11 +174,17 @@ Variable de entorno: `IAFIT_DATA_DIR` — default `~/.iafit` en local, `/root/.i
 En Docker: montar como volumen nombrado (`-v iafit-tokens:/root/.iafit`) para que los tokens sobrevivan reinicios del contenedor.  
 Cifrado: AES-256-GCM con clave derivada de `hostname:username` via scrypt. Para que el cifrado sea estable entre contenedores, el hostname debe ser fijo: usar `--hostname iafit` en el `docker run`.
 
+> El roundtrip de cifrado, la ausencia de tokens en claro en disco y la detección de
+> manipulación (GCM) están cubiertos por la suite (`tests/tokenStore.test.ts`).
+
 ### Mecanismo de confirmación para escrituras
 
 Parámetro `confirmed: boolean` en todas las tools de escritura:
 - `confirmed: false` → devuelve preview estructurado, **no ejecuta nada**
 - `confirmed: true` → ejecuta y devuelve resultado real de la API
+
+> Este contrato (con `confirmed: false` no se realiza ninguna llamada de escritura a la red)
+> está cubierto por la suite (`tests/confirmacion.test.ts`).
 
 ---
 
@@ -182,6 +225,9 @@ La imagen se construye una sola vez y se reconstruye cada vez que cambia el cód
 docker build -t iafit-mcp:latest .
 ```
 
+> En ejecución local sin Docker, el cliente MCP lanza `node dist/index.js` directamente
+> (ver `.mcp.json.example`), y `IAFIT_DATA_DIR` cae por defecto a `~/.iafit`.
+
 ### Futuro: HTTP/SSE
 
 Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir autenticación al servidor y manejo de sesiones OAuth por usuario. La lógica de tools no cambia.
@@ -196,7 +242,7 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 - **Confirmación:** no
 
 ### list_rules
-- **Parámetros:** `{ category: "architecture"|"code-standards"|"adrs"|"security" }`
+- **Parámetros:** `{ category: "architecture"|"code-standards"|"adrs"|"security"|"migration"|"observabilidad"|"pruebas"|"cicd" }`
 - **Retorna:** `{ rules: [{ slug, title, applies_to, status, last_updated }] }`
 - **Confirmación:** no
 
@@ -208,6 +254,17 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 ### search_rules
 - **Parámetros:** `{ query: string, category?: string }`
 - **Retorna:** `{ matches: [{ category, slug, title, excerpt }], total: number }`
+- **Confirmación:** no
+- **Nota:** la búsqueda es insensible a mayúsculas y a acentos; el excerpt conserva el texto original.
+
+### list_schemas
+- **Parámetros:** ninguno
+- **Retorna:** `{ schemas: [{ name, version, description }] }`
+- **Confirmación:** no
+
+### get_schema
+- **Parámetros:** `{ name: string }`
+- **Retorna:** `{ name, schemaYaml, templates: Record<string, string> }`
 - **Confirmación:** no
 
 ### get_work_item
@@ -252,7 +309,7 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 
 ## 6. Manejo de errores
 
-El servidor nunca lanza una excepción no capturada. Toda condición de error se devuelve como respuesta estructurada con campos `error` (código) y `message` (descripción legible).
+El servidor nunca lanza una excepción no capturada. Toda condición de error se devuelve como respuesta estructurada con campos `error` (código) y `message` (descripción legible). A nivel de protocolo MCP, las respuestas de error del despachador (`unknown_tool`, `internal_error`) se marcan con `isError: true`.
 
 | Condición | error | message |
 |-----------|-------|---------|
@@ -265,8 +322,12 @@ El servidor nunca lanza una excepción no capturada. Toda condición de error se
 | Recurso no encontrado (404) | `not_found` | Recurso no encontrado: {url} |
 | Timeout o red caída | `network_error` | No se pudo conectar a Azure DevOps. Reintenta en unos segundos. |
 | Rate limit (429) | `rate_limited` | Azure DevOps respondió 429. Espera antes de reintentar. |
+| Otro error HTTP de la API | `api_error` | Azure DevOps respondió {status}: {cuerpo}. |
 | Regla local no encontrada | `rule_not_found` | No existe regla con slug '{slug}' en categoría '{category}'. |
-| Categoría inválida | `invalid_category` | Categorías válidas: architecture, code-standards, adrs, security. |
+| Schema no encontrado / nombre inválido | `schema_not_found` | No existe schema '{name}'. Usa list_schemas para ver los disponibles. |
+| Categoría inválida | `invalid_category` | Categorías válidas: architecture, code-standards, adrs, security, migration, observabilidad, pruebas, cicd. |
+| Tool inexistente | `unknown_tool` | Tool '{name}' no existe. |
+| Excepción no controlada en un handler | `internal_error` | (mensaje del error) |
 
 ---
 
@@ -323,4 +384,32 @@ Entra ID de EAFIT y están fuera del alcance del código. Omítelos si usas PAT 
 
 ---
 
-*Versión del diseño: 0.4 — dockerización MVP.*
+## 8. Pruebas
+
+La suite usa **vitest** y vive en `tests/`. Ejecución:
+
+```bash
+npm test           # corre toda la suite una vez
+npm run test:watch # modo watch para desarrollo
+```
+
+Cobertura por área:
+
+| Archivo | Qué protege |
+|---------|-------------|
+| `rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda insensible a acentos/mayúsculas |
+| `schemasReader.test.ts` | Listado, descripción plegada, obtención con plantillas, rechazo de path traversal |
+| `tokenStore.test.ts` | Roundtrip de cifrado, ausencia de secretos en claro, detección de manipulación, `clearTokens` |
+| `azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
+| `confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
+| `toolDefinitions.test.ts` | Catálogo de tools: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
+| `rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+
+Los módulos leen `process.env` en el momento de importarse; por eso los tests fijan las
+variables de entorno (`IAFIT_RULES_DIR`, `IAFIT_SCHEMAS_DIR`, `IAFIT_DATA_DIR`, credenciales
+de Azure) antes de importar dinámicamente cada módulo, y `vitest.config.ts` aísla cada
+archivo en su propio proceso (`pool: 'forks'`, `isolate: true`).
+
+---
+
+*Versión del diseño: 0.5 — MVP local con suite de pruebas; se agregan tools de schemas, prompts, y las 8 categorías de reglas.*

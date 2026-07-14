@@ -137,8 +137,37 @@ export interface SearchMatch {
   excerpt: string;
 }
 
+/**
+ * Pliega un code point para búsqueda: quita diacríticos (migración → migracion)
+ * y pasa a minúsculas. Garantiza mapeo 1:1 en code points para que los índices
+ * del texto plegado coincidan con los del texto original.
+ */
+function foldCodePoint(c: string): string {
+  const folded = c.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const points = Array.from(folded);
+  return points.length === 1 ? points[0] : c;
+}
+
+function foldToCodePoints(s: string): string[] {
+  return Array.from(s).map(foldCodePoint);
+}
+
+/** indexOf de subsecuencia sobre arreglos de code points. */
+function indexOfCodePoints(haystack: string[], needle: string[]): number {
+  if (needle.length === 0 || needle.length > haystack.length) return -1;
+  outer: for (let i = 0; i + needle.length <= haystack.length; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+
 export function searchRules(query: string, category?: Category): SearchMatch[] {
-  const lower = query.toLowerCase();
+  const foldedQuery = foldToCodePoints(query.trim());
+  if (foldedQuery.length === 0) return [];
+
   const categories = category ? [category] : VALID_CATEGORIES;
   const results: SearchMatch[] = [];
 
@@ -148,14 +177,16 @@ export function searchRules(query: string, category?: Category): SearchMatch[] {
         const raw = fs.readFileSync(path.join(RULES_DIR, cat, file), 'utf8');
         const { data, content } = matter(raw);
         const fm = data as Partial<RuleFrontmatter>;
-        const combined = `${fm.title ?? ''} ${content}`.toLowerCase();
 
-        if (!combined.includes(lower)) continue;
+        const original = Array.from(`${fm.title ?? ''} ${content}`);
+        const folded = original.map(foldCodePoint);
 
-        const idx = combined.indexOf(lower);
+        const idx = indexOfCodePoints(folded, foldedQuery);
+        if (idx === -1) continue;
+
         const start = Math.max(0, idx - 80);
-        const end = Math.min(combined.length, idx + query.length + 80);
-        const excerpt = `...${combined.slice(start, end).trim()}...`;
+        const end = Math.min(original.length, idx + foldedQuery.length + 80);
+        const excerpt = `...${original.slice(start, end).join('').trim()}...`;
 
         results.push({
           category: cat,

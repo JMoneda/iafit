@@ -223,3 +223,26 @@ npm install
 npm run build
 node dist/index.js
 ```
+
+### Pruebas
+
+La suite usa [vitest](https://vitest.dev). No requiere red ni credenciales reales: el
+cliente de Azure DevOps se prueba con `fetch` mockeado y las lecturas de reglas/schemas
+usan fixtures.
+
+```bash
+npm test           # corre toda la suite una vez
+npm run test:watch # modo watch durante el desarrollo
+```
+
+Cobertura por área:
+
+| Archivo | Qué protege |
+|---------|-------------|
+| `tests/rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda insensible a acentos/mayúsculas |
+| `tests/schemasReader.test.ts` | Listado, descripción plegada, obtención con plantillas, rechazo de path traversal |
+| `tests/tokenStore.test.ts` | Cifrado (roundtrip, sin secretos en claro, detección de manipulación), `clearTokens` |
+| `tests/azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
+| `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
+| `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
+| `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |

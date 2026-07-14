@@ -3,7 +3,7 @@
     "iafit": {
       "type": "stdio",
       "command": "node",
-      "args": ["C:/Repos/iafit/dist/index.js"],
+      "args": ["C:/Repos/Estudio/iafit/dist/index.js"],
       "env": {
         "AZURE_AD_CLIENT_ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
         "AZURE_AD_TENANT_ID": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",

@@ -5,7 +5,7 @@ import type { Category } from '../../utils/rulesReader.js';
 export const definition: Tool = {
   name: 'search_rules',
   description:
-    'Busca por texto libre en todas las reglas de todas las categorías. Útil cuando no sabes en qué categoría está la regla o cuando buscas por concepto (ej. "JWT", "secrets", "pagination"). Devuelve fragmentos del contenido relevante.',
+    'Busca por texto libre en todas las reglas de todas las categorías (insensible a mayúsculas y acentos). Útil cuando no sabes en qué categoría está la regla o cuando buscas por concepto (ej. "JWT", "secrets", "pagination"). Devuelve fragmentos del contenido relevante.',
   inputSchema: {
     type: 'object',
     properties: {
