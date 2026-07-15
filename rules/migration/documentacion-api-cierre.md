@@ -13,8 +13,9 @@ status: active
 Al **cerrar el `apply`** de un salto —y de forma consolidada en el último salto de cada
 API— se deja el API **lo mejor documentado posible**:
 
-1. **README del API actualizado**: propósito, cómo correr en local, endpoints principales,
-   variables/configuración requeridas y cómo se despliega.
+1. **README del API completo**: contra el checklist de completitud de
+   [[readme-api-completo]] —propósito, requisitos, cómo correr en local, configuración,
+   endpoints, autenticación, pruebas y despliegue—, no solo "actualizado a medias".
 2. **Swagger / OpenAPI presente y correcto**: si el API **no lo tiene, se implementa**; si lo
    tiene, se verifica que refleje los endpoints actuales.
 

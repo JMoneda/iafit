@@ -75,7 +75,7 @@ it('Should return the original array', () => {
   **se castea** (`null as unknown as T`, `default!`, `#nullable disable` local); son las
   entradas que el código de producción sigue recibiendo en tiempo de ejecución.
 - **El umbral de cobertura no baja** en un salto: queda igual o sube (ver
-  [[pruebas-frontend-angular]]).
+  [[pruebas-frontend-angular]], [[revision-pruebas-cobertura]]).
 - **Si una prueba es genuinamente incorrecta** (probaba un bug), no se corrige aquí: se
   documenta como hallazgo y se aborda en un change separado (ver
   [[sugerencias-post-migracion]]).

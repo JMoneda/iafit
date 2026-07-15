@@ -74,7 +74,8 @@ pipeline no termina.
 - **El script que corre CI no es el que corre el desarrollador.** `test:ci` es explícito en
   headless, sin watch y con cobertura; `test` puede ser cómodo.
 - **Los umbrales no bajan.** Ni para "desbloquear el pipeline", ni durante una migración: en
-  un salto de versión quedan **iguales o suben** (ver [[pruebas-son-linea-base]]).
+  un salto de versión quedan **iguales o suben** (ver [[pruebas-son-linea-base]],
+  [[revision-pruebas-cobertura]]).
 - **Toda rama pública (`public-api.ts`) de una librería tiene prueba.** Es código que ejecutan
   terceros (ver [[librerias-publicadas]]).
 - **Los casos límite se prueban explícitamente**: `null`, `undefined`, arreglo vacío, un solo
@@ -83,7 +84,9 @@ pipeline no termina.
 - **Prohibido `xit` / `it.skip` en la rama principal.** Una prueba omitida es una prueba que
   no existe, con el costo de mantenerla y ninguno de sus beneficios.
 - **La cobertura se publica en el pipeline** (`PublishCodeCoverageResults`) y alimenta el gate
-  de SonarQube, igual que en backend (ver [[pruebas-unitarias]], [[azure-devops]]).
+  de SonarQube, igual que en backend (ver [[pruebas-unitarias]], [[azure-devops]]). El umbral y
+  la revisión de calidad de los asertos los fija [[revision-pruebas-cobertura]] (100% sobre
+  código nuevo, líneas y ramas).
 
 ## Verificación
 

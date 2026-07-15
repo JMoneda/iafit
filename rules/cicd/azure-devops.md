@@ -50,7 +50,8 @@ entornos.
   creados a mano; reproducibilidad y auditoría.
 - **ACR** como registro privado de imágenes del backend, con integración a Container Apps.
 - **SonarQube** integrado como gate de calidad/cobertura: **bloquea el ascenso de ambiente**
-  si no se cumple el umbral (ver [[pruebas-unitarias]], [[pruebas-frontend-angular]]).
+  si no se cumple el umbral —**100% sobre código nuevo**, líneas y ramas
+  (ver [[revision-pruebas-cobertura]], [[pruebas-unitarias]], [[pruebas-frontend-angular]]).
 - **Secretos exclusivamente desde Key Vault**, nunca persistidos en código o variables.
 - Tres entornos (**Dev/QA/Prod**) con la misma estructura de recursos y variaciones de
   escala/acceso/monitoreo (ver [[plataforma-azure]]).

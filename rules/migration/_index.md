@@ -18,6 +18,7 @@ description: Reglas y matrices para migrar/actualizar proyectos entre versiones 
 | documentacion-walkthrough | Documentación con snippets ejecutados (Showboat) | frontend, backend |
 | sugerencias-post-migracion | Sugerencias de refactor y hallazgos al cerrar la migración | frontend, backend |
 | documentacion-api-cierre | Documentar el API al cerrar el apply (README + Swagger/OpenAPI) | backend |
+| readme-api-completo | El README del API queda completo al cerrar (checklist de completitud) | backend, frontend |
 | angular-a-13 | Angular → 13 | frontend |
 | angular-a-14 | Angular → 14 | frontend |
 | angular-a-15 | Angular → 15 | frontend |

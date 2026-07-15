@@ -37,8 +37,10 @@ vulnerabilidades avance a QA/Prod.
 
 ## Reglas específicas
 
-- **SonarQube en CI/CD** con umbral definido por el equipo técnico: si no se cumple
-  cobertura/calidad, **se bloquea el despliegue** (ver [[azure-devops]]).
+- **SonarQube en CI/CD** con el umbral de [[revision-pruebas-cobertura]] (**100% sobre código
+  nuevo**, líneas y ramas): si no se cumple cobertura/calidad, **se bloquea el despliegue**
+  (ver [[azure-devops]]). La cobertura es el piso; la revisión de la **calidad de los asertos**
+  es parte del PR.
 - Las pruebas se ejecutan en el pipeline de **PR** y de **CI** (ver [[azure-devops]]).
 - Cada caso de uso nuevo llega con sus pruebas; no se acepta lógica de negocio sin cubrir.
 - Los proyectos de test siguen la estructura `tests/<Producto>.<Capa>.UnitTests`

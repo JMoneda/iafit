@@ -29,9 +29,11 @@ orden, y **todo artefacto se redacta en español**:
    sigue cumpliendo las specs de la fase 2.
 5. **README final** — al cerrar la migración del proyecto, generar/actualizar un
    README en español que sintetice lo aprendido, porque muchos proyectos no tienen
-   documentación o es deficiente. Además, al cerrar el `apply` de cada API se deja el
-   API bien documentado: README del API + Swagger/OpenAPI (implementarlo si no existe),
-   como documentación, sin alterar comportamiento (ver [[documentacion-api-cierre]]).
+   documentación o es deficiente. El README general queda **completo** contra su checklist
+   de completitud (ver [[readme-api-completo]]), no a medias ni con el boilerplate del
+   generador. Además, al cerrar el `apply` de cada API se deja el API bien documentado:
+   README + Swagger/OpenAPI (implementarlo si no existe), como documentación, sin alterar
+   comportamiento (ver [[documentacion-api-cierre]]).
 6. **Sugerencias de refactor** — consolidar las vulnerabilidades y mejoras detectadas
    durante el proceso como sugerencias por API, para changes futuros separados; las de
    seguridad se proponen como HU (ver [[sugerencias-post-migracion]]).
@@ -59,7 +61,7 @@ saltos pequeños y verificables hace la migración auditable y reversible.
   contrato y se verifica en cada salto (ver [[librerias-publicadas]]).
 - **El README final se deriva** de las specs y walkthroughs acumulados, no se
   redacta a mano desde cero. El README boilerplate del CLI (`ng serve`, `ng e2e`) **no es
-  documentación**: si sigue ahí al cerrar, la fase 5 no se hizo.
+  documentación**: si sigue ahí al cerrar, la fase 5 no se hizo (ver [[readme-api-completo]]).
 - **El orden no se salta.** Si no hay inventario ni research, no se inicia la
   migración incremental.
 
