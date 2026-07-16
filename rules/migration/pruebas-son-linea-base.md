@@ -81,6 +81,27 @@ it('Should return the original array', () => {
   [[sugerencias-post-migracion]]).
 - **Toda prueba tocada en un salto se justifica** en `notas-migracion.md`, con el motivo
   exacto del cambio de sintaxis.
+- **Cada defecto corregido durante la migración trae su prueba de regresión**: la prueba que
+  habría detectado la regresión se escribe junto con el fix, para que ese comportamiento quede
+  cubierto de ahí en adelante.
+
+## Cuando el proyecto arranca con 0 pruebas
+
+Si no hay ninguna prueba, la red de seguridad **no existe todavía** y no se puede tocar el
+framework: cualquier "no rompí nada" sería una afirmación sin evidencia. Antes del **Salto 1**
+se crea una red mínima de **pruebas de caracterización** contra el comportamiento **ACTUAL**:
+
+- Se escriben y **se ven pasar contra el estado actual** (antes de migrar); documentan lo que
+  el sistema hace hoy, no lo que "debería" hacer. Si el sistema tiene un bug observable, la
+  prueba captura el bug (es contrato hasta decidir lo contrario, ver [[preservar-comportamiento]]).
+- En backend, el instrumento natural son las **pruebas de contrato** de la
+  [[linea-base-de-contrato]] (snapshots de las respuestas reales) más pruebas unitarias de la
+  lógica de negocio expuesta.
+- Esta creación de la red es trabajo de **estabilización previo**, no parte del salto de
+  framework: va antes, para que a partir de ahí cada salto tenga contra qué verificarse
+  ([[proceso-migracion]], [[linea-base-compila]]).
+- A partir de ese punto, esa suite **es** la línea base: aplican todas las reglas de arriba
+  (no se debilita, no baja el conteo ni la cobertura).
 
 ## Verificación
 

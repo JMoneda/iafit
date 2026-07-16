@@ -12,6 +12,11 @@ description: Reglas y matrices para migrar/actualizar proyectos entre versiones 
 | preservar-comportamiento | Actualizar sin alterar comportamiento ni conexiones | frontend, backend |
 | pruebas-son-linea-base | Las pruebas son línea base: no se debilitan para que pasen | frontend, backend |
 | linea-base-compila | La línea base debe compilar antes de migrar | frontend, backend |
+| linea-base-de-contrato | Línea base de contrato: snapshots del API + diff por salto | backend |
+| compuertas-de-salto | Compuertas de verificación por salto (definition of done) | frontend, backend |
+| reversibilidad-por-salto | Reversibilidad garantizada por salto (commit aislado + rollback) | frontend, backend |
+| verificar-fuente-oficial | Re-verificar EOL y breaking changes contra la fuente oficial | frontend, backend |
+| serializacion-vector-de-ruptura | Serialización JSON como vector de ruptura (.NET) | backend |
 | residuos-de-migracion | No dejar configuración a medio migrar (residuos) | frontend, backend |
 | alineacion-ecosistema | Los majors del ecosistema siguen al del framework | frontend, backend |
 | librerias-publicadas | Migrar una librería publicada: el manifiesto es el contrato | frontend, libreria |
