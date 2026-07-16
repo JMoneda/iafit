@@ -126,6 +126,33 @@ docker build -t iafit-mcp:latest .
 - `--hostname iafit` mantiene estable el host para reutilizar los tokens cifrados.
 - **Reconstruye la imagen** (`docker build …`) cada vez que actualices el código.
 
+## Solución de problemas
+
+### `MCP error -32000: Connection closed`
+
+El cliente cerró la conexión porque el servidor no completó el handshake. En un servidor
+MCP con transport **stdio**, casi siempre es una de estas causas (en orden de frecuencia):
+
+1. **Algo escribió en `stdout` que no era JSON-RPC.** En stdio, **stdout es exclusivamente
+   el canal del protocolo**: un `console.log`, o un banner de una librería (p. ej. el aviso
+   `◇ injected env … from .env` de `dotenv` v17), corrompe el handshake. La carga del `.env`
+   se silencia con `quiet: true` (ver `src/loadEnv.ts`); si agregas código, respeta la
+   **regla de oro** de [Desarrollo local](#desarrollo-local).
+2. **No compilaste.** Falta `dist/index.js` o está desactualizado → `npm install && npm run build`.
+3. **`node` no está en el PATH** del proceso que lanza el MCP (típico con **nvm-windows**):
+   usa la ruta absoluta como `command`, p. ej. `C:/Program Files/nodejs/node.exe`, o activa
+   una versión con `nvm use 20` antes de arrancar el cliente.
+4. **Node < 18** (requisito de `engines`) → `node -v` debe ser ≥ 18. La v16 de nvm no sirve.
+
+**Diagnóstico rápido** — ejecuta el servidor a mano y confirma que **stdout sale vacío** al
+arrancar (queda esperando stdin, que es lo correcto):
+
+```bash
+node dist/index.js
+# No debe imprimir NADA en stdout. Si aparece texto, ESA es la causa del -32000.
+# Ctrl+C para salir.
+```
+
 ## Reglas
 
 Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías actuales:
@@ -223,6 +250,12 @@ npm install
 npm run build
 node dist/index.js
 ```
+
+> ⚠️ **Regla de oro (transport stdio): stdout está reservado para el protocolo JSON-RPC.**
+> Nunca escribas en stdout desde el código del servidor —ni `console.log`, ni banners de
+> librerías—. Para trazas y diagnóstico usa `console.error` (stderr). Cualquier byte suelto
+> en stdout rompe al cliente con `-32000: Connection closed` (ver
+> [Solución de problemas](#solución-de-problemas)).
 
 ### Pruebas
 
