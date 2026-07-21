@@ -116,7 +116,7 @@ docker build -t iafit-mcp:latest .
       "args": [
         "run", "-i", "--rm",
         "--hostname", "iafit",
-        "-p", "3456:3456",
+        "-p", "3456-3458:3456-3458",
         "-v", "iafit-tokens:/root/.iafit",
         "--env-file", "/ruta/absoluta/a/.env",
         "iafit-mcp:latest"
@@ -129,6 +129,9 @@ docker build -t iafit-mcp:latest .
 - `-i` es obligatorio para que el stdio fluya entre el cliente y el contenedor.
 - `--rm` limpia el contenedor al cerrar; el volumen `iafit-tokens` persiste los tokens.
 - `--hostname iafit` mantiene estable el host para reutilizar los tokens cifrados.
+- **Puerto OAuth:** el callback usa 3456 y, si está ocupado, cae a 3457/3458; por eso se
+  mapea el rango `3456-3458` (no solo 3456). Con PAT no se usa ningún puerto. Si prefieres
+  fijar uno, exporta solo `-p 3456:3456` y asegúrate de que esté libre.
 - **Reconstruye la imagen** (`docker build …`) cada vez que actualices el código.
 
 ## Solución de problemas

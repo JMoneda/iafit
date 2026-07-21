@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import './loadEnv.js'; // DEBE ir primero: carga .env antes que módulos que leen process.env
+import { createRequire } from 'module';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import {
@@ -51,8 +52,13 @@ const tools: ToolModule[] = [
 
 const toolMap = new Map(tools.map(t => [t.definition.name, t.handler]));
 
+// La versión se lee de package.json (única fuente de verdad) en vez de
+// hardcodearla aquí, para que no se desincronice al publicar una nueva.
+const require = createRequire(import.meta.url);
+const { version } = require('../package.json') as { version: string };
+
 const server = new Server(
-  { name: 'iafit', version: '0.1.0' },
+  { name: 'iafit', version },
   { capabilities: { tools: {}, prompts: {} } },
 );
 
