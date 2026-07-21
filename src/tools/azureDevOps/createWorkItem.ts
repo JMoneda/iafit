@@ -56,16 +56,31 @@ interface WorkItemTypeField {
 }
 
 /**
+ * Cache en memoria de las definiciones de campos por (proyecto, tipo). Las
+ * definiciones de un proceso cambian rarísimo y `$expand=allowedValues` es una
+ * respuesta pesada; como el MCP es un proceso por sesión, cachear durante la vida
+ * del proceso evita repetir la llamada si el mismo tipo se reintenta varias veces.
+ * Solo se puebla cuando hay error de campo obligatorio, así que el costo es acotado.
+ */
+const typeFieldsCache = new Map<string, WorkItemTypeField[]>();
+
+/**
  * Lee la definición de campos del tipo de work item (nombre, reference name,
  * si es obligatorio y sus valores permitidos). Lectura best-effort: si falla,
- * devuelve [] para no bloquear el flujo principal.
+ * devuelve [] para no bloquear el flujo principal. Cachea por (proyecto, tipo);
+ * un resultado vacío por error NO se cachea (para poder reintentar).
  */
 async function getTypeFields(type: string, project?: string): Promise<WorkItemTypeField[]> {
+  const cacheKey = `${project ?? ''}::${type}`;
+  const cached = typeFieldsCache.get(cacheKey);
+  if (cached) return cached;
+
   const res = await adoGet<{ value?: WorkItemTypeField[] }>(
     `wit/workitemtypes/${encodeURIComponent(type)}/fields?$expand=allowedValues`,
     project,
   );
   if (isAzureError(res) || !res.value) return [];
+  typeFieldsCache.set(cacheKey, res.value);
   return res.value;
 }
 
