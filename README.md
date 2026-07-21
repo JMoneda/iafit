@@ -365,3 +365,33 @@ Cobertura por área:
 | `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
 | `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+| `tests/usageLog.test.ts` | Telemetría: una línea por llamada, desactivación con `IAFIT_TELEMETRY=0`, fire-and-forget, rotación y `extractMeta` (búsquedas con 0 resultados, sin payloads sensibles) |
+
+## Telemetría de uso (local)
+
+El servidor registra, de forma **local y best-effort**, qué tools se llaman para poder
+mejorar el catálogo de reglas con datos en vez de intuición. El caso más valioso son las
+búsquedas con **cero resultados**: dicen qué reglas faltan o con qué términos las busca la
+gente.
+
+- **Dónde:** `~/.iafit/usage.jsonl` (o `IAFIT_DATA_DIR`), el mismo directorio de los tokens.
+  Una línea JSON por llamada; rota a `usage.jsonl.1` al superar 5 MB.
+- **Qué se registra:** marca de tiempo, nombre de la tool, si tuvo éxito y **metadata
+  mínima** (p. ej. `query`+`total` de una búsqueda, `category`+`slug` de un `get_rule`).
+  **Nunca** se registran payloads completos, títulos, ni contenidos de reglas o work items.
+- **NUNCA escribe en stdout:** solo al archivo. Un fallo de E/S se ignora en silencio; la
+  telemetría jamás interrumpe una llamada (ver la regla de oro de stdout).
+- **Privacidad:** el log es local en cada máquina y puede contener términos de búsqueda con
+  contexto del proyecto. No se envía a ningún lado.
+- **Desactivar:** define `IAFIT_TELEMETRY=0` en el `env` del MCP o en `.env`.
+
+### Ver el reporte
+
+```bash
+npm run usage:report
+# o con otra ubicación de datos:
+IAFIT_DATA_DIR=/ruta node scripts/usage-report.mjs
+```
+
+El reporte agrega el JSONL y responde tres preguntas: qué tools se usan (y cuáles fallan),
+qué reglas se leen más, y qué búsquedas dieron cero resultados. Es de solo lectura.

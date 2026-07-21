@@ -24,6 +24,7 @@ import * as createWorkItem from './tools/azureDevOps/createWorkItem.js';
 import * as updateWorkItem from './tools/azureDevOps/updateWorkItem.js';
 import * as addPrComment from './tools/azureDevOps/addPrComment.js';
 import { prompts, promptMap } from './prompts/index.js';
+import { logUsage, extractMeta } from './utils/usageLog.js';
 
 type ToolModule = {
   definition: { name: string; description?: string; inputSchema: object };
@@ -74,6 +75,7 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   const handler = toolMap.get(name);
 
   if (!handler) {
+    logUsage({ ts: new Date().toISOString(), tool: name, ok: false, meta: { error: 'unknown_tool' } });
     return {
       isError: true,
       content: [
@@ -87,10 +89,20 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
 
   try {
     const result = await handler(args as Record<string, unknown>);
+    // Telemetría best-effort: registra la llamada con metadata accionable. Un
+    // resultado con `error` estructurado cuenta como no-ok (p. ej. invalid_category).
+    const res = (result ?? {}) as Record<string, unknown>;
+    logUsage({
+      ts: new Date().toISOString(),
+      tool: name,
+      ok: typeof res.error !== 'string',
+      meta: extractMeta(name, args as Record<string, unknown>, result),
+    });
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
     };
   } catch (err) {
+    logUsage({ ts: new Date().toISOString(), tool: name, ok: false, meta: { error: 'internal_error' } });
     return {
       isError: true,
       content: [
