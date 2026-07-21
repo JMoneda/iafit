@@ -32,6 +32,7 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | Prompt | Qué hace |
 |--------|----------|
 | `iafit-inicio` | Saludo y orientación (desarrollar vs migrar) |
+| `iafit-desarrollo` | Onboarding de desarrollo: detecta el stack, confirma el contexto y carga las reglas aplicables (`get_applicable_rules`) antes de escribir código |
 | `iafit-migracion` | Onboarding de migración: entrevista, configura OpenSpec y arranca las fases |
 
 > Nota: los clientes MCP soportan **tools** de forma universal; el soporte de **prompts**
