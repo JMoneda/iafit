@@ -13,6 +13,7 @@ async function loadAllTools() {
     import('../src/tools/rules/listRules.js'),
     import('../src/tools/rules/getRule.js'),
     import('../src/tools/rules/searchRules.js'),
+    import('../src/tools/rules/getApplicableRules.js'),
     import('../src/tools/schemas/listSchemas.js'),
     import('../src/tools/schemas/getSchema.js'),
     import('../src/tools/azureDevOps/getWorkItem.js'),
@@ -29,11 +30,11 @@ async function loadAllTools() {
 const TOOLS_DE_ESCRITURA = ['create_work_item', 'update_work_item', 'add_pr_comment'];
 
 describe('catálogo de tools — contrato', () => {
-  it('expone 13 tools con nombres únicos', async () => {
+  it('expone 14 tools con nombres únicos', async () => {
     const tools = await loadAllTools();
     const nombres = tools.map(t => t.definition.name);
-    expect(nombres).toHaveLength(13);
-    expect(new Set(nombres).size).toBe(13);
+    expect(nombres).toHaveLength(14);
+    expect(new Set(nombres).size).toBe(14);
   });
 
   it('toda tool tiene descripción, inputSchema tipo object y handler función', async () => {

@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import matter from 'gray-matter';
+import { VALID_TAGS } from '../src/utils/rulesReader.js';
 
 /**
  * Integridad del contenido: valida TODAS las reglas reales de rules/.
@@ -105,5 +106,37 @@ describe('integridad del contenido de rules/', () => {
     }
 
     expect(duplicados, `\n${duplicados.join('\n')}`).toEqual([]);
+  });
+
+  it('todo applies_to usa solo tags del vocabulario cerrado (VALID_TAGS)', () => {
+    const invalidos: string[] = [];
+
+    for (const categoria of categoriasExistentes()) {
+      for (const archivo of reglasDe(categoria)) {
+        const ruta = path.join(RULES_DIR, categoria, archivo);
+        let data: Record<string, unknown>;
+        try {
+          ({ data } = matter(fs.readFileSync(ruta, 'utf8')));
+        } catch {
+          continue; // ya reportado en el test de frontmatter
+        }
+        const appliesTo = data.applies_to;
+        if (appliesTo === undefined) continue; // opcional; el reader aplica ['all']
+        if (!Array.isArray(appliesTo)) {
+          invalidos.push(`${categoria}/${archivo}: applies_to no es una lista`);
+          continue;
+        }
+        for (const tag of appliesTo) {
+          if (!VALID_TAGS.includes(tag as (typeof VALID_TAGS)[number])) {
+            invalidos.push(
+              `${categoria}/${archivo}: tag '${String(tag)}' no está en VALID_TAGS ` +
+                `(${VALID_TAGS.join('|')}). Añádelo en rulesReader.ts si es intencional.`,
+            );
+          }
+        }
+      }
+    }
+
+    expect(invalidos, `\n${invalidos.join('\n')}`).toEqual([]);
   });
 });

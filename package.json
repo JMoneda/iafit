@@ -14,7 +14,8 @@
     "dev": "tsx src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "usage:report": "node scripts/usage-report.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.0",

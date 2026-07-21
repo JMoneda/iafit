@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 *.enc
+usage.jsonl
+usage.jsonl.*

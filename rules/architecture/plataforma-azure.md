@@ -28,7 +28,7 @@ reduce el costo de soporte transversal y evita soluciones aisladas por equipo.
 | Negocio — Gateway | API Management (punto único de entrada) |
 | Negocio — Backend | Container Apps (microservicios .NET 8, stateless, autoescalado) |
 | Negocio — Async | Workers en Container Apps (offloading de tareas pesadas) |
-| Datos — Relacional | Azure SQL Database (ver [[azure-sql-database]]) |
+| Datos — Relacional | Azure SQL Database (ver [[0002-azure-sql-database]]) |
 | Datos — Archivos | Azure Blob Storage |
 | IA | Azure AI Foundry / Azure OpenAI, Content Safety |
 | Seguridad | Entra ID, Key Vault, RBAC/MSI |

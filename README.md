@@ -20,6 +20,10 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | `list_rules` | Lista las reglas de una categoría (omite obsoletas salvo `include_inactive`) |
 | `get_rule` | Devuelve el contenido completo de una regla (avisa si está obsoleta y a qué fue reemplazada) |
 | `search_rules` | Búsqueda por tokens con ranking en todas las reglas (relevancia, `limit`, `include_inactive`) |
+| `list_rules` | Lista las reglas de una categoría |
+| `get_rule` | Devuelve el contenido completo de una regla |
+| `search_rules` | Búsqueda por texto libre en todas las reglas |
+| `get_applicable_rules` | Devuelve, en una sola llamada, todas las reglas activas que aplican a un stack o contexto (por tags de `applies_to`); atajo para arrancar una tarea de desarrollo |
 | `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT |
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
 | `get_work_item` · `query_work_items` | Azure DevOps: work items |
@@ -31,6 +35,7 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | Prompt | Qué hace |
 |--------|----------|
 | `iafit-inicio` | Saludo y orientación (desarrollar vs migrar) |
+| `iafit-desarrollo` | Onboarding de desarrollo: detecta el stack, confirma el contexto y carga las reglas aplicables (`get_applicable_rules`) antes de escribir código |
 | `iafit-migracion` | Onboarding de migración: entrevista, configura OpenSpec y arranca las fases |
 
 > Nota: los clientes MCP soportan **tools** de forma universal; el soporte de **prompts**
@@ -180,9 +185,36 @@ como obsoleta, añade `superseded_by: "categoria:slug"` (o `"slug"`) apuntando a
 `get_rule` mostrará un aviso que redirige a ella. La búsqueda de `search_rules` es **por
 tokens con ranking** (título pesa más que `applies_to`, y este más que el cuerpo; casar
 todos los términos rankea por encima de casar solo uno), insensible a acentos y mayúsculas.
+**Enlaces entre reglas (wikilinks):** referencia otras reglas con `[[slug]]`, o con
+`[[categoria:slug]]` cuando el mismo slug exista en más de una categoría. El test
+`tests/wikilinks.test.ts` **rechaza enlaces rotos o ambiguos**, así que renombrar o mover
+una regla obliga a actualizar quienes la enlazan (el build lo detecta).
 
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).
+
+### Tags de `applies_to` (vocabulario cerrado)
+
+El campo `applies_to` del frontmatter usa un **vocabulario cerrado** de tags, definido en
+`VALID_TAGS` (`src/utils/rulesReader.ts`). Es lo que permite que `get_applicable_rules`
+filtre por contexto de forma confiable: si una regla escribiera `net` y otra `dotnet`, el
+matching por intersección fallaría en silencio. Por eso el test de integridad
+(`tests/rulesContent.test.ts`) **rechaza cualquier tag fuera de la lista**.
+
+| Tag | Significado |
+|-----|-------------|
+| `all` | Regla transversal: aplica a cualquier stack o contexto (seguridad, observabilidad, CI/CD). Se incluye sola; no se pide como tag de búsqueda |
+| `backend` | Servicios backend (independiente del lenguaje) |
+| `frontend` | Aplicaciones y librerías de front-end |
+| `data` | Persistencia y modelado de datos |
+| `dotnet` | Stack .NET / C# |
+| `angular` | Stack Angular |
+| `typescript` | Código TypeScript (front o back) |
+| `libreria` | Librería publicada (feed privado / npm) |
+
+Una regla sin `applies_to` se trata como `["all"]`. Para **añadir un tag nuevo**, edítalo en
+`VALID_TAGS` (y su descripción en `TAG_DESCRIPTIONS`) — es un cambio deliberado, no un valor
+libre que se cuela por un typo.
 
 ## Schemas de migración (OpenSpec)
 
@@ -375,3 +407,34 @@ Cobertura por área:
 | `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
 | `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by` |
+| `tests/usageLog.test.ts` | Telemetría: una línea por llamada, desactivación con `IAFIT_TELEMETRY=0`, fire-and-forget, rotación y `extractMeta` (búsquedas con 0 resultados, sin payloads sensibles) |
+
+## Telemetría de uso (local)
+
+El servidor registra, de forma **local y best-effort**, qué tools se llaman para poder
+mejorar el catálogo de reglas con datos en vez de intuición. El caso más valioso son las
+búsquedas con **cero resultados**: dicen qué reglas faltan o con qué términos las busca la
+gente.
+
+- **Dónde:** `~/.iafit/usage.jsonl` (o `IAFIT_DATA_DIR`), el mismo directorio de los tokens.
+  Una línea JSON por llamada; rota a `usage.jsonl.1` al superar 5 MB.
+- **Qué se registra:** marca de tiempo, nombre de la tool, si tuvo éxito y **metadata
+  mínima** (p. ej. `query`+`total` de una búsqueda, `category`+`slug` de un `get_rule`).
+  **Nunca** se registran payloads completos, títulos, ni contenidos de reglas o work items.
+- **NUNCA escribe en stdout:** solo al archivo. Un fallo de E/S se ignora en silencio; la
+  telemetría jamás interrumpe una llamada (ver la regla de oro de stdout).
+- **Privacidad:** el log es local en cada máquina y puede contener términos de búsqueda con
+  contexto del proyecto. No se envía a ningún lado.
+- **Desactivar:** define `IAFIT_TELEMETRY=0` en el `env` del MCP o en `.env`.
+
+### Ver el reporte
+
+```bash
+npm run usage:report
+# o con otra ubicación de datos:
+IAFIT_DATA_DIR=/ruta node scripts/usage-report.mjs
+```
+
+El reporte agrega el JSONL y responde tres preguntas: qué tools se usan (y cuáles fallan),
+qué reglas se leen más, y qué búsquedas dieron cero resultados. Es de solo lectura.
+| `tests/wikilinks.test.ts` | Integridad de wikilinks: todo `[[slug]]`/`[[categoria:slug]]` del corpus resuelve a una regla existente y no ambigua |
