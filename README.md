@@ -17,6 +17,9 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | Tool | Qué hace |
 |------|----------|
 | `list_rule_categories` | Lista las categorías de reglas y cuántas hay en cada una |
+| `list_rules` | Lista las reglas de una categoría (omite obsoletas salvo `include_inactive`) |
+| `get_rule` | Devuelve el contenido completo de una regla (avisa si está obsoleta y a qué fue reemplazada) |
+| `search_rules` | Búsqueda por tokens con ranking en todas las reglas (relevancia, `limit`, `include_inactive`) |
 | `list_rules` | Lista las reglas de una categoría |
 | `get_rule` | Devuelve el contenido completo de una regla |
 | `search_rules` | Búsqueda por texto libre en todas las reglas |
@@ -174,6 +177,14 @@ Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías 
 (`title`, `category`, `slug`, `version`, `last_updated`, `applies_to`, `status`) y
 actualiza el `_index.md` de la categoría.
 
+**Ciclo de vida (`status`) y búsqueda:** el `status` puede ser `active` (default), `draft`,
+`deprecated` o `superseded`. Las reglas `deprecated`/`superseded` **no se listan ni se
+devuelven en búsquedas por defecto** (para no sugerir reglas obsoletas); pasa
+`include_inactive: true` a `list_rules`/`search_rules` para verlas. Cuando marques una regla
+como obsoleta, añade `superseded_by: "categoria:slug"` (o `"slug"`) apuntando a la vigente:
+`get_rule` mostrará un aviso que redirige a ella. La búsqueda de `search_rules` es **por
+tokens con ranking** (título pesa más que `applies_to`, y este más que el cuerpo; casar
+todos los términos rankea por encima de casar solo uno), insensible a acentos y mayúsculas.
 **Enlaces entre reglas (wikilinks):** referencia otras reglas con `[[slug]]`, o con
 `[[categoria:slug]]` cuando el mismo slug exista en más de una categoría. El test
 `tests/wikilinks.test.ts` **rechaza enlaces rotos o ambiguos**, así que renombrar o mover
@@ -388,13 +399,14 @@ Cobertura por área:
 
 | Archivo | Qué protege |
 |---------|-------------|
-| `tests/rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda insensible a acentos/mayúsculas |
+| `tests/rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, y búsqueda por tokens con ranking (insensible a acentos/mayúsculas, cobertura, `limit`) |
 | `tests/schemasReader.test.ts` | Listado, descripción plegada, obtención con plantillas, rechazo de path traversal |
 | `tests/tokenStore.test.ts` | Cifrado (roundtrip, sin secretos en claro, detección de manipulación), `clearTokens` |
 | `tests/azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
 | `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
 | `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+| `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by` |
 | `tests/usageLog.test.ts` | Telemetría: una línea por llamada, desactivación con `IAFIT_TELEMETRY=0`, fire-and-forget, rotación y `extractMeta` (búsquedas con 0 resultados, sin payloads sensibles) |
 
 ## Telemetría de uso (local)

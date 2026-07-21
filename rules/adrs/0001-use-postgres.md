@@ -6,6 +6,7 @@ version: "1.1"
 last_updated: "2026-07-09"
 applies_to: ["backend", "data"]
 status: superseded
+superseded_by: "adrs:0002-azure-sql-database"
 ---
 
 > **SUPERSEDED por [[0002-azure-sql-database]] (2026-07-09).** La arquitectura de
