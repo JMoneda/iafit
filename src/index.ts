@@ -14,6 +14,7 @@ import * as listRuleCategories from './tools/rules/listRuleCategories.js';
 import * as listRules from './tools/rules/listRules.js';
 import * as getRule from './tools/rules/getRule.js';
 import * as searchRules from './tools/rules/searchRules.js';
+import * as getApplicableRules from './tools/rules/getApplicableRules.js';
 import * as listSchemas from './tools/schemas/listSchemas.js';
 import * as getSchema from './tools/schemas/getSchema.js';
 import * as getWorkItem from './tools/azureDevOps/getWorkItem.js';
@@ -36,6 +37,7 @@ const tools: ToolModule[] = [
   listRules,
   getRule,
   searchRules,
+  getApplicableRules,
   listSchemas,
   getSchema,
   getWorkItem,
