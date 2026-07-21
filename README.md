@@ -24,7 +24,7 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
 | `get_work_item` · `query_work_items` | Azure DevOps: work items |
 | `list_pull_requests` · `get_pr_threads` · `add_pr_comment` | Azure DevOps: pull requests |
-| `create_work_item` · `update_work_item` | Azure DevOps: escritura de work items |
+| `create_work_item` · `update_work_item` | Azure DevOps: escritura de work items (soportan **campos personalizados**; ver [Work items](#work-items-campos-personalizados-y-confirmación)) |
 
 ### Prompts
 
@@ -166,7 +166,7 @@ Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías 
 | `pruebas` | Pruebas unitarias (xUnit, Moq) y calidad (SonarQube) |
 | `cicd` | CI/CD con Azure DevOps (pipelines, Bicep, ACR) |
 | `adrs` | Architecture Decision Records |
-| `migration` | Convención de ramas, proceso, **preservar comportamiento** (actualizar sin alterar conexiones/lógica), **línea base compila** (verificar build antes de migrar), matriz Angular (`angular-a-13…22`), matriz .NET (`dotnet-a-5…10`, ruta `3.1→…→10`), **Azure Functions** (`azure-functions-a-v4-inproc` → `azure-functions-a-isolated`), documentación estilo walkthrough, **sugerencias de refactor** al cierre (vulnerabilidades/mejoras → changes/HU futuros), **documentación del API** al cerrar el apply (README + Swagger/OpenAPI, implementarlo si falta) |
+| `migration` | Convención de ramas, proceso, **preservar comportamiento** (actualizar sin alterar conexiones/lógica), **línea base compila** (verificar build antes de migrar), **línea base de contrato** (snapshots del API + diff por salto), **compuertas de salto** (definition of done por salto), **reversibilidad por salto** (commit aislado + rollback), **verificar fuente oficial** (re-confirmar EOL/breaking changes contra la doc oficial), **serialización como vector de ruptura** (Newtonsoft → System.Text.Json), matriz Angular (`angular-a-13…22`), matriz .NET (`dotnet-a-5…10`, ruta `3.1→…→10`), **Azure Functions** (`azure-functions-a-v4-inproc` → `azure-functions-a-isolated`), documentación estilo walkthrough, **sugerencias de refactor** al cierre (vulnerabilidades/mejoras → changes/HU futuros), **documentación del API** al cerrar el apply (README + Swagger/OpenAPI, implementarlo si falta) |
 
 **Agregar una regla:** crea `rules/<categoría>/<slug>.md` con frontmatter
 (`title`, `category`, `slug`, `version`, `last_updated`, `applies_to`, `status`) y
@@ -222,8 +222,16 @@ definido, se usa el PAT; si no, cae al flujo OAuth.
 ### PAT (self-service, sin admin de Entra ID)
 
 1. Azure DevOps → *User settings* → *Personal access tokens* → **New Token**.
-2. Org `eafit-dinfo`, expiración corta, scope **Work Items ▸ Read** (mínimo privilegio).
+2. Org `eafit-dinfo`, expiración corta, y el scope mínimo según lo que uses:
+   - solo lectura de work items (`get_work_item`, `query_work_items`) → **Work Items ▸ Read**;
+   - crear/actualizar work items (`create_work_item`, `update_work_item`) → **Work Items ▸ Read & Write**;
+   - tools de PRs (`list_pull_requests`, `get_pr_threads`, `add_pr_comment`) → **Code ▸ Read & Write**.
 3. Copia el token y ponlo en `AZURE_DEVOPS_PAT` (en el `env` del MCP o en `.env`).
+
+> **El PAT caduca.** Cuando expira, Azure DevOps responde 401 y las tools reportan
+> `auth_expired` ("la sesión expiró"). No se usa `az login` ni ningún flujo de navegador con
+> PAT: se **genera un token nuevo** en la misma pantalla, se reemplaza el valor de
+> `AZURE_DEVOPS_PAT` y se **reinicia el servidor MCP** (el `.env` se lee al arrancar).
 
 No hay login interactivo: IAFIT autentica con Basic auth directamente. El PAT es un
 **secreto** — nunca lo pongas en `.env.example` ni lo subas al repo; si se expone,
@@ -242,6 +250,84 @@ Esperando autenticación (timeout: 2 minutos)...
 Abre la URL, completa el login de Microsoft y el servidor recibe el callback por el puerto
 mapeado (`3456:3456`). Requiere un registro de app en Entra ID (necesita permisos de admin
 del tenant) — ver [DESIGN.md](DESIGN.md) sección 7.
+
+## Work items: campos personalizados y confirmación
+
+### Confirmación explícita (todas las escrituras)
+
+`create_work_item`, `update_work_item` y `add_pr_comment` son **tools de escritura** y exigen
+confirmación en dos pasos:
+
+1. Se llama con `confirmed: false` → devuelve un **preview** de lo que se haría, sin tocar
+   Azure DevOps.
+2. Tras la aprobación explícita del usuario, se llama con `confirmed: true` → ejecuta.
+
+### Campos personalizados (`fields`)
+
+Los procesos de Azure DevOps suelen definir **campos personalizados**, y algunos son
+**obligatorios** (p. ej. `Task Type` en el proyecto `SolucionesIA`). Tanto `create_work_item`
+como `update_work_item` aceptan un mapa `fields` cuyas claves son el **reference name** del
+campo:
+
+```jsonc
+{
+  "type": "Task",
+  "title": "Configurar pipeline",
+  "confirmed": true,
+  "fields": {
+    "Custom.TaskType": "Development",
+    "Microsoft.VSTS.Common.Priority": 2
+  }
+}
+```
+
+Los parámetros de conveniencia (`title`, `description`, `assignedTo`, `tags`) mapean a campos
+`System.*`; cualquier otro campo va en `fields`. Si no conoces el reference name de un campo,
+míralo en Azure DevOps → *Project settings* → *Process* → el tipo de work item → el campo, o
+deja que la tool te lo diga (ver abajo).
+
+### Vínculo padre-hijo (`parent`)
+
+En Azure DevOps la relación padre-hijo **no es un campo** (`System.Parent` no funciona): es una
+**relación** (link). Por eso ambas tools exponen el parámetro `parent` (el ID del work item
+padre) y lo aplican como una operación sobre `/relations/-` con el tipo
+`System.LinkTypes.Hierarchy-Reverse`:
+
+```jsonc
+// Crear una Task ya vinculada a su User Story 34732:
+{ "type": "Task", "title": "Configurar pipeline", "parent": 34732, "confirmed": true }
+
+// Vincular una Task existente (34888) a la HU 34732, sin cambiar más nada:
+{ "id": 34888, "parent": 34732, "confirmed": true }
+```
+
+`update_work_item` acepta `fields`, `parent` o ambos; con solo `parent` emite únicamente la
+relación. Si no pasas ni `fields` ni `parent`, responde `nothing_to_update` sin tocar nada.
+
+### Cuando falta un campo obligatorio
+
+Si intentas crear un work item sin un campo obligatorio del proceso, **la tool no crea nada** y
+responde con una estructura `requires_input` que incluye los campos faltantes y sus valores
+permitidos:
+
+```jsonc
+{
+  "requires_input": true,
+  "created": false,
+  "message": "El proyecto exige campos obligatorios que no se enviaron; el work item NO se creó. Pídele al usuario el valor de cada campo faltante y reintenta con `fields`.",
+  "missingFields": [
+    {
+      "referenceName": "Custom.TaskType",
+      "name": "Task Type",
+      "allowedValues": ["Development", "Analysis", "Configuration"]
+    }
+  ]
+}
+```
+
+El agente usa esa respuesta para **pedirle el dato al usuario** (respetando `allowedValues` si
+el campo está limitado a valores) y reintenta `create_work_item` con `confirmed: true`
+incluyendo el campo en `fields`. Así el flujo se resuelve sin fallar de forma opaca.
 
 ## Desarrollo local
 

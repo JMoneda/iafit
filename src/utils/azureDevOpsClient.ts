@@ -15,6 +15,14 @@ export function resolveProject(project?: string): string {
   return project ?? DEFAULT_PROJECT;
 }
 
+/**
+ * URL REST (a nivel de organización) de un work item. Se usa como `value.url`
+ * al crear relaciones/links entre work items (p. ej. el vínculo padre-hijo).
+ */
+export function workItemUrl(id: number): string {
+  return `https://dev.azure.com/${ORG}/_apis/wit/workItems/${id}`;
+}
+
 function baseUrl(project: string): string {
   return `https://dev.azure.com/${ORG}/${encodeURIComponent(project)}/_apis`;
 }
@@ -79,8 +87,20 @@ async function request<T>(url: string, options: RequestOptions = {}): Promise<T 
     return { error: 'rate_limited', message: 'Azure DevOps respondió 429. Espera antes de reintentar.' };
   }
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    return { error: 'api_error', message: `Azure DevOps respondió ${res.status}: ${body.slice(0, 200)}` };
+    const raw = await res.text().catch(() => '');
+    // Azure DevOps devuelve el detalle en un JSON { message, typeKey, ... }.
+    // Extraemos el `message` legible (p. ej. reglas de campos obligatorios) en vez
+    // de propagar el JSON crudo truncado, que ocultaba la causa real.
+    let detail = raw;
+    try {
+      const parsed = JSON.parse(raw) as { message?: unknown };
+      if (typeof parsed.message === 'string' && parsed.message.trim() !== '') {
+        detail = parsed.message;
+      }
+    } catch {
+      /* no era JSON: se usa el texto tal cual */
+    }
+    return { error: 'api_error', message: `Azure DevOps respondió ${res.status}: ${detail.slice(0, 500)}` };
   }
 
   return res.json() as Promise<T>;
