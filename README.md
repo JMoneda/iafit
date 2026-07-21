@@ -172,6 +172,11 @@ Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías 
 (`title`, `category`, `slug`, `version`, `last_updated`, `applies_to`, `status`) y
 actualiza el `_index.md` de la categoría.
 
+**Enlaces entre reglas (wikilinks):** referencia otras reglas con `[[slug]]`, o con
+`[[categoria:slug]]` cuando el mismo slug exista en más de una categoría. El test
+`tests/wikilinks.test.ts` **rechaza enlaces rotos o ambiguos**, así que renombrar o mover
+una regla obliga a actualizar quienes la enlazan (el build lo detecta).
+
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).
 
@@ -365,3 +370,4 @@ Cobertura por área:
 | `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
 | `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+| `tests/wikilinks.test.ts` | Integridad de wikilinks: todo `[[slug]]`/`[[categoria:slug]]` del corpus resuelve a una regla existente y no ambigua |
