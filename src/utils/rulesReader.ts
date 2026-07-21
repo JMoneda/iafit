@@ -43,6 +43,54 @@ export function isValidCategory(cat: string): cat is Category {
   return VALID_CATEGORIES.includes(cat as Category);
 }
 
+/**
+ * Vocabulario CERRADO de tags para `applies_to`. Existe para que el matching de
+ * get_applicable_rules sea confiable: si un frontmatter escribiera "net" y otro
+ * "dotnet", el filtrado por intersección fallaría en silencio. El test de
+ * integridad (rulesContent.test.ts) rechaza cualquier tag fuera de esta lista,
+ * así que ampliar el vocabulario es un cambio deliberado (editar aquí) y no un
+ * typo que se cuela.
+ *
+ * `all` es especial: una regla con applies_to:["all"] aplica a CUALQUIER contexto
+ * (ver appliesToTags). No se pide como tag de búsqueda; se usa en las reglas
+ * transversales (seguridad, observabilidad, cicd).
+ */
+export type Tag =
+  | 'all'
+  | 'backend'
+  | 'frontend'
+  | 'data'
+  | 'dotnet'
+  | 'angular'
+  | 'typescript'
+  | 'libreria';
+
+export const VALID_TAGS: Tag[] = [
+  'all',
+  'backend',
+  'frontend',
+  'data',
+  'dotnet',
+  'angular',
+  'typescript',
+  'libreria',
+];
+
+export const TAG_DESCRIPTIONS: Record<Tag, string> = {
+  all: 'Regla transversal: aplica a cualquier stack o contexto',
+  backend: 'Servicios backend (independiente del lenguaje)',
+  frontend: 'Aplicaciones y librerías de front-end',
+  data: 'Persistencia y modelado de datos',
+  dotnet: 'Stack .NET / C#',
+  angular: 'Stack Angular',
+  typescript: 'Código TypeScript (front o back)',
+  libreria: 'Librería publicada (feed privado / npm)',
+};
+
+export function isValidTag(tag: string): tag is Tag {
+  return VALID_TAGS.includes(tag as Tag);
+}
+
 export interface RuleFrontmatter {
   title: string;
   category: string;
@@ -200,6 +248,99 @@ export function searchRules(query: string, category?: Category): SearchMatch[] {
       }
     }
   }
+
+  return results;
+}
+
+export interface ApplicableRule {
+  category: Category;
+  slug: string;
+  title: string;
+  applies_to: string[];
+  status: string;
+  /** Presente solo en mode='full'. */
+  content?: string;
+  /** Presente solo en mode='summary': primeras líneas útiles del cuerpo. */
+  excerpt?: string;
+}
+
+/**
+ * Decide si una regla, según su `applies_to`, aplica a un conjunto de tags de
+ * contexto. Una regla `["all"]` aplica siempre; en caso contrario, aplica si hay
+ * intersección entre sus tags y los pedidos. El match es exacto sobre el
+ * vocabulario cerrado (VALID_TAGS), no por substring.
+ */
+export function appliesToTags(ruleTags: string[], requested: string[]): boolean {
+  if (ruleTags.includes('all')) return true;
+  return ruleTags.some(t => requested.includes(t));
+}
+
+/** Extrae un excerpt corto del cuerpo: la primera línea de prosa no vacía. */
+function firstProseLine(content: string): string {
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === '' || line.startsWith('#') || line.startsWith('>')) continue;
+    return line.length > 160 ? `${line.slice(0, 157)}...` : line;
+  }
+  return '';
+}
+
+/**
+ * Devuelve, en UNA sola pasada por todo el corpus, las reglas activas que aplican
+ * a los tags de contexto dados. Es el atajo pensado para el arranque de una tarea
+ * de desarrollo: en vez de encadenar list_rule_categories → list_rules → get_rule,
+ * el agente pide de golpe todo lo que aplica a, p. ej., ["angular","frontend"].
+ *
+ * - mode='summary' (default): título, slug, applies_to y un excerpt de una línea.
+ *   Pensado para que el agente decida qué leer sin saturar su contexto.
+ * - mode='full': incluye el contenido completo de cada regla.
+ *
+ * Excluye reglas deprecated/superseded: nunca se sugiere aplicar una regla obsoleta.
+ * El orden prioriza las reglas más específicas (menos tags 'all') primero.
+ */
+export function getApplicableRules(
+  tags: string[],
+  mode: 'summary' | 'full' = 'summary',
+): ApplicableRule[] {
+  const results: ApplicableRule[] = [];
+
+  for (const cat of VALID_CATEGORIES) {
+    for (const file of listMarkdownFiles(cat)) {
+      try {
+        const raw = fs.readFileSync(path.join(RULES_DIR, cat, file), 'utf8');
+        const { data, content } = matter(raw);
+        const fm = data as Partial<RuleFrontmatter>;
+
+        const status = fm.status ?? 'active';
+        if (status === 'deprecated' || status === 'superseded') continue;
+
+        const ruleTags = fm.applies_to ?? ['all'];
+        if (!appliesToTags(ruleTags, tags)) continue;
+
+        const base: ApplicableRule = {
+          category: cat,
+          slug: fm.slug ?? file.replace('.md', ''),
+          title: fm.title ?? file,
+          applies_to: ruleTags,
+          status,
+        };
+        if (mode === 'full') base.content = content;
+        else base.excerpt = firstProseLine(content);
+
+        results.push(base);
+      } catch {
+        // se omiten archivos ilegibles; rulesContent.test.ts los cazaría
+      }
+    }
+  }
+
+  // Reglas específicas antes que transversales (['all'] al final).
+  results.sort((a, b) => {
+    const aAll = a.applies_to.includes('all') ? 1 : 0;
+    const bAll = b.applies_to.includes('all') ? 1 : 0;
+    if (aAll !== bAll) return aAll - bAll;
+    return a.category.localeCompare(b.category) || a.slug.localeCompare(b.slug);
+  });
 
   return results;
 }
