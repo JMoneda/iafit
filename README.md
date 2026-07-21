@@ -20,6 +20,7 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | `list_rules` | Lista las reglas de una categoría |
 | `get_rule` | Devuelve el contenido completo de una regla |
 | `search_rules` | Búsqueda por texto libre en todas las reglas |
+| `get_applicable_rules` | Devuelve, en una sola llamada, todas las reglas activas que aplican a un stack o contexto (por tags de `applies_to`); atajo para arrancar una tarea de desarrollo |
 | `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT |
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
 | `get_work_item` · `query_work_items` | Azure DevOps: work items |
@@ -179,6 +180,29 @@ una regla obliga a actualizar quienes la enlazan (el build lo detecta).
 
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).
+
+### Tags de `applies_to` (vocabulario cerrado)
+
+El campo `applies_to` del frontmatter usa un **vocabulario cerrado** de tags, definido en
+`VALID_TAGS` (`src/utils/rulesReader.ts`). Es lo que permite que `get_applicable_rules`
+filtre por contexto de forma confiable: si una regla escribiera `net` y otra `dotnet`, el
+matching por intersección fallaría en silencio. Por eso el test de integridad
+(`tests/rulesContent.test.ts`) **rechaza cualquier tag fuera de la lista**.
+
+| Tag | Significado |
+|-----|-------------|
+| `all` | Regla transversal: aplica a cualquier stack o contexto (seguridad, observabilidad, CI/CD). Se incluye sola; no se pide como tag de búsqueda |
+| `backend` | Servicios backend (independiente del lenguaje) |
+| `frontend` | Aplicaciones y librerías de front-end |
+| `data` | Persistencia y modelado de datos |
+| `dotnet` | Stack .NET / C# |
+| `angular` | Stack Angular |
+| `typescript` | Código TypeScript (front o back) |
+| `libreria` | Librería publicada (feed privado / npm) |
+
+Una regla sin `applies_to` se trata como `["all"]`. Para **añadir un tag nuevo**, edítalo en
+`VALID_TAGS` (y su descripción en `TAG_DESCRIPTIONS`) — es un cambio deliberado, no un valor
+libre que se cuela por un typo.
 
 ## Schemas de migración (OpenSpec)
 
