@@ -1,15 +1,9 @@
 #!/usr/bin/env node
 import './loadEnv.js'; // DEBE ir primero: carga .env antes que módulos que leen process.env
 import { createRequire } from 'module';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  ListPromptsRequestSchema,
-  GetPromptRequestSchema,
-  type GetPromptResult,
-} from '@modelcontextprotocol/sdk/types.js';
+import type { CallToolResult, GetPromptResult } from '@modelcontextprotocol/sdk/types.js';
 
 import * as listRuleCategories from './tools/rules/listRuleCategories.js';
 import * as listRules from './tools/rules/listRules.js';
@@ -25,13 +19,9 @@ import * as getPrThreads from './tools/azureDevOps/getPrThreads.js';
 import * as createWorkItem from './tools/azureDevOps/createWorkItem.js';
 import * as updateWorkItem from './tools/azureDevOps/updateWorkItem.js';
 import * as addPrComment from './tools/azureDevOps/addPrComment.js';
-import { prompts, promptMap } from './prompts/index.js';
+import type { ToolModule } from './tools/types.js';
+import { prompts } from './prompts/index.js';
 import { logUsage, extractMeta } from './utils/usageLog.js';
-
-type ToolModule = {
-  definition: { name: string; description?: string; inputSchema: object };
-  handler: (args: Record<string, unknown>) => unknown;
-};
 
 const tools: ToolModule[] = [
   listRuleCategories,
@@ -50,81 +40,70 @@ const tools: ToolModule[] = [
   addPrComment,
 ];
 
-const toolMap = new Map(tools.map(t => [t.definition.name, t.handler]));
-
 // La versión se lee de package.json (única fuente de verdad) en vez de
 // hardcodearla aquí, para que no se desincronice al publicar una nueva.
 const require = createRequire(import.meta.url);
 const { version } = require('../package.json') as { version: string };
 
-const server = new Server(
-  { name: 'iafit', version },
-  { capabilities: { tools: {}, prompts: {} } },
-);
+const server = new McpServer({ name: 'iafit', version });
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: tools.map(t => t.definition),
-}));
+/**
+ * Envuelve el handler de una tool para:
+ *  1) serializar su resultado al formato de contenido de MCP (texto JSON),
+ *  2) registrar telemetría best-effort (qué tool, si fue ok, metadata accionable),
+ *  3) traducir una excepción a un error estructurado `internal_error`.
+ *
+ * Nota: la validación de argumentos (tipos, requeridos) la hace zod en la frontera
+ * de `registerTool` ANTES de este wrapper; aquí los args ya vienen validados. Un
+ * resultado con `error` string cuenta como no-ok (p. ej. invalid_category), pero
+ * se devuelve como contenido normal (no isError): es una respuesta legítima que el
+ * agente debe leer, no un fallo de protocolo.
+ */
+function withTelemetry(name: string, handler: ToolModule['handler']) {
+  return async (args: Record<string, unknown>): Promise<CallToolResult> => {
+    try {
+      const result = await handler(args);
+      const res = (result ?? {}) as Record<string, unknown>;
+      logUsage({
+        ts: new Date().toISOString(),
+        tool: name,
+        ok: typeof res.error !== 'string',
+        meta: extractMeta(name, args, result),
+      });
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      logUsage({ ts: new Date().toISOString(), tool: name, ok: false, meta: { error: 'internal_error' } });
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              error: 'internal_error',
+              message: err instanceof Error ? err.message : String(err),
+            }),
+          },
+        ],
+      };
+    }
+  };
+}
 
-server.setRequestHandler(ListPromptsRequestSchema, async () => ({
-  prompts: prompts.map(p => ({ name: p.name, description: p.description })),
-}));
+for (const { definition, handler } of tools) {
+  server.registerTool(
+    definition.name,
+    { description: definition.description, inputSchema: definition.inputSchema },
+    withTelemetry(definition.name, handler),
+  );
+}
 
-server.setRequestHandler(GetPromptRequestSchema, async request => {
-  const prompt = promptMap.get(request.params.name);
-  if (!prompt) {
-    throw new Error(`Prompt '${request.params.name}' no existe.`);
-  }
-  return prompt.build() as unknown as GetPromptResult;
-});
-
-server.setRequestHandler(CallToolRequestSchema, async request => {
-  const { name, arguments: args = {} } = request.params;
-  const handler = toolMap.get(name);
-
-  if (!handler) {
-    logUsage({ ts: new Date().toISOString(), tool: name, ok: false, meta: { error: 'unknown_tool' } });
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({ error: 'unknown_tool', message: `Tool '${name}' no existe.` }),
-        },
-      ],
-    };
-  }
-
-  try {
-    const result = await handler(args as Record<string, unknown>);
-    // Telemetría best-effort: registra la llamada con metadata accionable. Un
-    // resultado con `error` estructurado cuenta como no-ok (p. ej. invalid_category).
-    const res = (result ?? {}) as Record<string, unknown>;
-    logUsage({
-      ts: new Date().toISOString(),
-      tool: name,
-      ok: typeof res.error !== 'string',
-      meta: extractMeta(name, args as Record<string, unknown>, result),
-    });
-    return {
-      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-    };
-  } catch (err) {
-    logUsage({ ts: new Date().toISOString(), tool: name, ok: false, meta: { error: 'internal_error' } });
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify({
-            error: 'internal_error',
-            message: err instanceof Error ? err.message : String(err),
-          }),
-        },
-      ],
-    };
-  }
-});
+for (const prompt of prompts) {
+  server.registerPrompt(
+    prompt.name,
+    { description: prompt.description },
+    () => prompt.build() as unknown as GetPromptResult,
+  );
+}
 
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();

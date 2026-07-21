@@ -1,29 +1,27 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import { adoPost, isAzureError } from '../../utils/azureDevOpsClient.js';
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'add_pr_comment',
   description:
     'Agrega un comentario a un pull request de Azure DevOps, en un hilo nuevo o existente. REQUIERE CONFIRMACIÓN EXPLÍCITA: llama primero con confirmed=false para ver un preview del comentario, muéstraselo al usuario, y solo llama con confirmed=true tras su aprobación explícita. No publiques comentarios sin confirmación.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      repository: { type: 'string', description: 'Nombre del repositorio.' },
-      pullRequestId: { type: 'number', description: 'ID del pull request.' },
-      comment: { type: 'string', description: 'Texto del comentario a agregar.' },
-      threadId: {
-        type: 'number',
-        description:
-          'ID del hilo existente al que responder (ver get_pr_threads). Si se omite, crea un hilo nuevo.',
-      },
-      project: { type: 'string', description: 'Proyecto de Azure DevOps (opcional).' },
-      confirmed: {
-        type: 'boolean',
-        description:
-          'false = devuelve preview sin publicar nada. true = publica el comentario en Azure DevOps.',
-      },
-    },
-    required: ['repository', 'pullRequestId', 'comment', 'confirmed'],
+    repository: z.string().describe('Nombre del repositorio.'),
+    pullRequestId: z.number().describe('ID del pull request.'),
+    comment: z.string().describe('Texto del comentario a agregar.'),
+    threadId: z
+      .number()
+      .optional()
+      .describe(
+        'ID del hilo existente al que responder (ver get_pr_threads). Si se omite, crea un hilo nuevo.',
+      ),
+    project: z.string().optional().describe('Proyecto de Azure DevOps (opcional).'),
+    confirmed: z
+      .boolean()
+      .describe(
+        'false = devuelve preview sin publicar nada. true = publica el comentario en Azure DevOps.',
+      ),
   },
 };
 

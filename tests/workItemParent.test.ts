@@ -64,8 +64,19 @@ describe('create_work_item — vínculo padre', () => {
 });
 
 describe('update_work_item — vínculo padre', () => {
-  it('con `parent` y sin `fields` emite solo la relación (PATCH)', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(okResponse(34888));
+  /** Localiza la llamada PATCH (la escritura) entre todas las llamadas a fetch. */
+  const patchCall = (mock: ReturnType<typeof vi.fn>) =>
+    mock.mock.calls.find(c => ((c as [string, RequestInit?])[1]?.method ?? 'GET') === 'PATCH') as
+      | [string, RequestInit]
+      | undefined;
+
+  /** Respuesta GET de un work item con las relations indicadas. */
+  const withRelations = (id: number, relations: Array<{ rel: string; url: string }>): Response =>
+    new Response(JSON.stringify({ id, fields: { 'System.Title': 'X' }, relations }), { status: 200 });
+
+  it('en un item huérfano (sin padre) solo agrega la relación', async () => {
+    // fresh Response por llamada: el GET consume el body, el PATCH necesita el suyo.
+    const fetchMock = vi.fn(() => Promise.resolve(okResponse(34888)));
     vi.stubGlobal('fetch', fetchMock);
     const { updateWorkItem } = await load();
 
@@ -74,9 +85,9 @@ describe('update_work_item — vínculo padre', () => {
       unknown
     >;
 
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(options.method).toBe('PATCH');
-    const patchDoc = JSON.parse(options.body as string) as Array<Record<string, unknown>>;
+    const call = patchCall(fetchMock)!;
+    expect(call[1].method).toBe('PATCH');
+    const patchDoc = JSON.parse(call[1].body as string) as Array<Record<string, unknown>>;
     expect(patchDoc).toEqual([
       { op: 'add', path: '/relations/-', value: { rel: REL_PARENT, url: PARENT_URL } },
     ]);
@@ -84,7 +95,7 @@ describe('update_work_item — vínculo padre', () => {
   });
 
   it('combina campos y parent en el mismo patch', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(okResponse(34888));
+    const fetchMock = vi.fn(() => Promise.resolve(okResponse(34888)));
     vi.stubGlobal('fetch', fetchMock);
     const { updateWorkItem } = await load();
 
@@ -95,14 +106,63 @@ describe('update_work_item — vínculo padre', () => {
       confirmed: true,
     });
 
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const patchDoc = JSON.parse(options.body as string) as Array<Record<string, unknown>>;
+    const patchDoc = JSON.parse(patchCall(fetchMock)![1].body as string) as Array<
+      Record<string, unknown>
+    >;
     expect(patchDoc).toContainEqual({ op: 'add', path: '/fields/System.State', value: 'Active' });
     expect(patchDoc).toContainEqual({
       op: 'add',
       path: '/relations/-',
       value: { rel: REL_PARENT, url: PARENT_URL },
     });
+  });
+
+  it('reasignar el padre de un item que YA tiene padre: remueve la relación previa antes de agregar la nueva', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        // GET: un hijo en el índice 0 y el padre actual (99999) en el índice 1.
+        withRelations(34888, [
+          { rel: 'System.LinkTypes.Hierarchy-Forward', url: 'https://dev.azure.com/eafit-dinfo/_apis/wit/workItems/555' },
+          { rel: REL_PARENT, url: 'https://dev.azure.com/eafit-dinfo/_apis/wit/workItems/99999' },
+        ]),
+      )
+      .mockResolvedValueOnce(okResponse(34888)); // PATCH
+    vi.stubGlobal('fetch', fetchMock);
+    const { updateWorkItem } = await load();
+
+    await updateWorkItem.handler({ id: 34888, parent: 34732, confirmed: true });
+
+    const patchDoc = JSON.parse(patchCall(fetchMock)![1].body as string) as Array<
+      Record<string, unknown>
+    >;
+    // La relación de padre estaba en el índice 1: se remueve por índice y se agrega la nueva.
+    expect(patchDoc).toContainEqual({ op: 'remove', path: '/relations/1' });
+    expect(patchDoc).toContainEqual({
+      op: 'add',
+      path: '/relations/-',
+      value: { rel: REL_PARENT, url: PARENT_URL },
+    });
+    // El remove debe ir ANTES del add (Azure aplica el patch en orden).
+    const idxRemove = patchDoc.findIndex(o => o.op === 'remove');
+    const idxAdd = patchDoc.findIndex(o => o.op === 'add' && o.path === '/relations/-');
+    expect(idxRemove).toBeLessThan(idxAdd);
+  });
+
+  it('reasignar al MISMO padre es un no-op: no emite PATCH y responde unchanged', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(withRelations(34888, [{ rel: REL_PARENT, url: PARENT_URL }]));
+    vi.stubGlobal('fetch', fetchMock);
+    const { updateWorkItem } = await load();
+
+    const r = (await updateWorkItem.handler({ id: 34888, parent: 34732, confirmed: true })) as Record<
+      string,
+      unknown
+    >;
+
+    expect(r).toMatchObject({ unchanged: true, parent: 34732 });
+    expect(patchCall(fetchMock), 'no debe emitir ninguna escritura').toBeUndefined();
   });
 
   it('sin fields ni parent devuelve nothing_to_update y no llama a la red', async () => {

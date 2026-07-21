@@ -1,50 +1,41 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import { adoGet, adoPost, isAzureError, workItemUrl } from '../../utils/azureDevOpsClient.js';
 
 /** Tipo de relación de Azure DevOps para el vínculo hacia el work item padre. */
 const REL_PARENT = 'System.LinkTypes.Hierarchy-Reverse';
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'create_work_item',
   description:
     'Crea un nuevo work item en Azure DevOps. Soporta campos personalizados del proceso (p. ej. "Task Type") vía el parámetro `fields`. REQUIERE CONFIRMACIÓN EXPLÍCITA: llama primero con confirmed=false para obtener un preview de lo que se crearía, muéstraselo al usuario, y solo llama con confirmed=true tras su aprobación explícita. Si el proyecto exige un campo obligatorio que no enviaste, la creación NO se realiza y la tool responde con requires_input=true y la lista de campos faltantes (con sus valores permitidos): pídeselos al usuario y reintenta con confirmed=true incluyéndolos en `fields`.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      type: {
-        type: 'string',
-        description: 'Tipo de work item. Ej: "Task", "Bug", "User Story".',
-      },
-      title: { type: 'string', description: 'Título del work item.' },
-      description: { type: 'string', description: 'Descripción (HTML permitido, opcional).' },
-      assignedTo: {
-        type: 'string',
-        description: 'Email o nombre para mostrar del asignado (opcional).',
-      },
-      tags: {
-        type: 'array',
-        items: { type: 'string' },
-        description: 'Tags a aplicar (opcional).',
-      },
-      fields: {
-        type: 'object',
-        description:
-          'Campos adicionales o personalizados del proceso. Claves = reference name del campo en Azure DevOps. Ej: { "Custom.TaskType": "Development", "Microsoft.VSTS.Common.Priority": 2 }. Úsalo para campos obligatorios del proceso que no cubren title/description/assignedTo/tags.',
-        additionalProperties: true,
-      },
-      parent: {
-        type: 'number',
-        description:
-          'ID del work item padre (opcional). Crea el vínculo jerárquico padre-hijo (p. ej. una Task bajo su User Story). Se aplica como relación, no como campo.',
-      },
-      project: { type: 'string', description: 'Proyecto de Azure DevOps (opcional).' },
-      confirmed: {
-        type: 'boolean',
-        description:
-          'false = devuelve preview sin ejecutar nada. true = ejecuta la creación en Azure DevOps.',
-      },
-    },
-    required: ['type', 'title', 'confirmed'],
+    type: z.string().describe('Tipo de work item. Ej: "Task", "Bug", "User Story".'),
+    title: z.string().describe('Título del work item.'),
+    description: z.string().optional().describe('Descripción (HTML permitido, opcional).'),
+    assignedTo: z
+      .string()
+      .optional()
+      .describe('Email o nombre para mostrar del asignado (opcional).'),
+    tags: z.array(z.string()).optional().describe('Tags a aplicar (opcional).'),
+    fields: z
+      .record(z.string(), z.unknown())
+      .optional()
+      .describe(
+        'Campos adicionales o personalizados del proceso. Claves = reference name del campo en Azure DevOps. Ej: { "Custom.TaskType": "Development", "Microsoft.VSTS.Common.Priority": 2 }. Úsalo para campos obligatorios del proceso que no cubren title/description/assignedTo/tags.',
+      ),
+    parent: z
+      .number()
+      .optional()
+      .describe(
+        'ID del work item padre (opcional). Crea el vínculo jerárquico padre-hijo (p. ej. una Task bajo su User Story). Se aplica como relación, no como campo.',
+      ),
+    project: z.string().optional().describe('Proyecto de Azure DevOps (opcional).'),
+    confirmed: z
+      .boolean()
+      .describe(
+        'false = devuelve preview sin ejecutar nada. true = ejecuta la creación en Azure DevOps.',
+      ),
   },
 };
 

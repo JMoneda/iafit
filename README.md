@@ -20,15 +20,13 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | `list_rules` | Lista las reglas de una categoría (omite obsoletas salvo `include_inactive`) |
 | `get_rule` | Devuelve el contenido completo de una regla (avisa si está obsoleta y a qué fue reemplazada) |
 | `search_rules` | Búsqueda por tokens con ranking en todas las reglas (relevancia, `limit`, `include_inactive`) |
-| `list_rules` | Lista las reglas de una categoría |
-| `get_rule` | Devuelve el contenido completo de una regla |
-| `search_rules` | Búsqueda por texto libre en todas las reglas |
 | `get_applicable_rules` | Devuelve, en una sola llamada, todas las reglas activas que aplican a un stack o contexto (por tags de `applies_to`); atajo para arrancar una tarea de desarrollo |
 | `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT |
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
-| `get_work_item` · `query_work_items` | Azure DevOps: work items |
-| `list_pull_requests` · `get_pr_threads` · `add_pr_comment` | Azure DevOps: pull requests |
-| `create_work_item` · `update_work_item` | Azure DevOps: escritura de work items (soportan **campos personalizados**; ver [Work items](#work-items-campos-personalizados-y-confirmación)) |
+| `get_work_item` | Azure DevOps: lee un work item por ID |
+| `query_work_items` | Azure DevOps: ejecuta WIQL; pagina el batch (`maxResults`, `truncated`) |
+| `list_pull_requests` · `get_pr_threads` · `add_pr_comment` | Azure DevOps: pull requests (`list_pull_requests` pagina con `maxResults`/`truncated`) |
+| `create_work_item` · `update_work_item` | Azure DevOps: escritura de work items (soportan **campos personalizados** y vínculo `parent`; ver [Work items](#work-items-campos-personalizados-y-confirmación)) |
 
 ### Prompts
 
@@ -132,6 +130,9 @@ docker build -t iafit-mcp:latest .
 - **Puerto OAuth:** el callback usa 3456 y, si está ocupado, cae a 3457/3458; por eso se
   mapea el rango `3456-3458` (no solo 3456). Con PAT no se usa ningún puerto. Si prefieres
   fijar uno, exporta solo `-p 3456:3456` y asegúrate de que esté libre.
+- **OAuth en Docker requiere `IAFIT_AUTH_HOST=0.0.0.0`** (en el `.env` o el `env` del MCP):
+  por defecto el callback escucha en `127.0.0.1`, que el reenvío de puertos (`-p`) no
+  alcanza desde fuera del contenedor. Con PAT no aplica (no hay callback).
 - **Reconstruye la imagen** (`docker build …`) cada vez que actualices el código.
 
 ## Solución de problemas
@@ -292,8 +293,11 @@ Esperando autenticación (timeout: 2 minutos)...
 ```
 
 Abre la URL, completa el login de Microsoft y el servidor recibe el callback por el puerto
-mapeado (`3456:3456`). Requiere un registro de app en Entra ID (necesita permisos de admin
-del tenant) — ver [DESIGN.md](DESIGN.md) sección 7.
+mapeado (`3456:3456`). El servidor de callback escucha en **loopback** (`127.0.0.1`) por
+defecto para no exponerse a la red durante la ventana de auth; **dentro de Docker** el
+reenvío de puertos no alcanza el loopback del contenedor, así que ahí hay que poner
+`IAFIT_AUTH_HOST=0.0.0.0` (ver [Opción Docker](#opción-docker)). Requiere un registro de app
+en Entra ID (necesita permisos de admin del tenant) — ver [DESIGN.md](DESIGN.md) sección 7.
 
 ## Work items: campos personalizados y confirmación
 
@@ -341,12 +345,16 @@ padre) y lo aplican como una operación sobre `/relations/-` con el tipo
 // Crear una Task ya vinculada a su User Story 34732:
 { "type": "Task", "title": "Configurar pipeline", "parent": 34732, "confirmed": true }
 
-// Vincular una Task existente (34888) a la HU 34732, sin cambiar más nada:
+// Vincular/reasignar una Task existente (34888) a la HU 34732, sin cambiar más nada:
 { "id": 34888, "parent": 34732, "confirmed": true }
 ```
 
 `update_work_item` acepta `fields`, `parent` o ambos; con solo `parent` emite únicamente la
-relación. Si no pasas ni `fields` ni `parent`, responde `nothing_to_update` sin tocar nada.
+relación. **Reasignar el padre** de un work item que ya tiene uno funciona: como Azure DevOps
+solo admite un padre por `Hierarchy-Reverse`, la tool lee las relaciones actuales, **remueve
+el vínculo previo** y agrega el nuevo (si el padre pedido ya es el actual, responde
+`unchanged` sin tocar nada). El `preview` de `confirmed:false` incluye `currentParent` para
+que veas de dónde sale. Si no pasas ni `fields` ni `parent`, responde `nothing_to_update`.
 
 ### Cuando falta un campo obligatorio
 
@@ -373,6 +381,18 @@ El agente usa esa respuesta para **pedirle el dato al usuario** (respetando `all
 el campo está limitado a valores) y reintenta `create_work_item` con `confirmed: true`
 incluyendo el campo en `fields`. Así el flujo se resuelve sin fallar de forma opaca.
 
+## Listados y paginación
+
+`list_pull_requests` y `query_work_items` **paginan** para no truncar resultados en silencio:
+
+- `list_pull_requests` recorre las páginas de Azure DevOps (`$top`/`$skip`) hasta reunir
+  `maxResults` (default 100). Devuelve `count` y `truncated: true` si hay más PRs de los
+  entregados (sube `maxResults` para ver más).
+- `query_work_items` acota el resultado del WIQL a `maxResults` (default 50) y trocea el
+  batch de ids en lotes de 200 (límite de la API de Azure DevOps), así funciona con cualquier
+  `maxResults`. Devuelve `totalCount` (lo que casó el WIQL) y `truncated: true` si es mayor
+  que lo devuelto.
+
 ## Desarrollo local
 
 ```bash
@@ -386,6 +406,17 @@ node dist/index.js
 > librerías—. Para trazas y diagnóstico usa `console.error` (stderr). Cualquier byte suelto
 > en stdout rompe al cliente con `-32000: Connection closed` (ver
 > [Solución de problemas](#solución-de-problemas)).
+
+### Tools y validación de entradas
+
+Cada tool es un módulo en `src/tools/**` que exporta `definition` (nombre, descripción e
+`inputSchema` como **raw shape de zod**) y un `handler`. `src/index.ts` las registra con
+`McpServer.registerTool`, que **valida los argumentos contra el esquema zod en la frontera**
+antes de invocar el handler: un tipo incorrecto o un requerido ausente se rechaza con un
+error claro, sin llegar al código de la tool. Los vocabularios cerrados con mensajes
+propios (categorías, tags) se validan además dentro del handler para devolver un error
+accionable (p. ej. `invalid_category` con la lista de válidas). Agregar una tool = crear el
+módulo y añadirlo al arreglo de `src/index.ts`.
 
 ### Pruebas
 
@@ -407,10 +438,14 @@ Cobertura por área:
 | `tests/tokenStore.test.ts` | Cifrado (roundtrip, sin secretos en claro, detección de manipulación), `clearTokens` |
 | `tests/azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
 | `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
-| `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
+| `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, `inputSchema` como raw shape de zod, `confirmed` obligatorio en escrituras |
+| `tests/workItemParent.test.ts` | Vínculo padre: `create`/`update` emiten la relación; reasignar remueve el padre previo antes de agregar el nuevo |
+| `tests/pagination.test.ts` | Paginación: `list_pull_requests` (`$top`/`$skip`, `truncated`) y troceo del batch de ids en `query_work_items` |
+| `tests/oauthFlow.test.ts` | OAuth: single-flight (un refresh por ráfaga concurrente), fast path del token vigente, liberación del lock tras fallo |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
 | `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by` |
 | `tests/usageLog.test.ts` | Telemetría: una línea por llamada, desactivación con `IAFIT_TELEMETRY=0`, fire-and-forget, rotación y `extractMeta` (búsquedas con 0 resultados, sin payloads sensibles) |
+| `tests/wikilinks.test.ts` | Integridad de wikilinks: todo `[[slug]]`/`[[categoria:slug]]` del corpus resuelve a una regla existente y no ambigua |
 
 ## Telemetría de uso (local)
 
@@ -440,4 +475,3 @@ IAFIT_DATA_DIR=/ruta node scripts/usage-report.mjs
 
 El reporte agrega el JSONL y responde tres preguntas: qué tools se usan (y cuáles fallan),
 qué reglas se leen más, y qué búsquedas dieron cero resultados. Es de solo lectura.
-| `tests/wikilinks.test.ts` | Integridad de wikilinks: todo `[[slug]]`/`[[categoria:slug]]` del corpus resuelve a una regla existente y no ambigua |

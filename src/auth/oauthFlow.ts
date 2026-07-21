@@ -7,10 +7,27 @@ const BASE_PORT = parseInt(process.env.IAFIT_AUTH_PORT ?? '3456');
 const PORTS_TO_TRY = [BASE_PORT, BASE_PORT + 1, BASE_PORT + 2];
 const AUTH_TIMEOUT_MS = 2 * 60 * 1000;
 
+/**
+ * Interfaz donde escucha el callback OAuth. Por defecto loopback (127.0.0.1): no se
+ * expone a la red local durante la ventana de auth. EXCEPCIÓN: dentro de Docker el
+ * reenvío de puertos (`-p`) no alcanza el loopback del contenedor, así que ahí hay que
+ * escuchar en 0.0.0.0 vía IAFIT_AUTH_HOST=0.0.0.0 (solo relevante con OAuth; con PAT no
+ * se usa ningún puerto).
+ */
+const AUTH_HOST = process.env.IAFIT_AUTH_HOST ?? '127.0.0.1';
+
 const TENANT_ID = process.env.AZURE_AD_TENANT_ID;
 const CLIENT_ID = process.env.AZURE_AD_CLIENT_ID;
 
 const SCOPES = 'https://app.vssps.visualstudio.com/user_impersonation offline_access';
+
+/**
+ * Resolución de token en curso (single-flight). Si varias tools se llaman de forma
+ * concurrente con el token expirado, todas reusan esta misma Promise en vez de
+ * disparar cada una su propio refresh —o peor, abrir varios navegadores compitiendo
+ * por el puerto 3456—. Se limpia al terminar (éxito o error).
+ */
+let inFlight: Promise<string | AuthError> | null = null;
 
 export type AuthError = { error: string; message: string };
 
@@ -24,11 +41,26 @@ function generatePKCE(): { verifier: string; challenge: string } {
   return { verifier, challenge };
 }
 
-async function tryListen(server: http.Server, port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    server.once('error', () => resolve(false));
-    server.listen(port, '0.0.0.0', () => resolve(true));
-  });
+/**
+ * Intenta escuchar en el primer puerto disponible de PORTS_TO_TRY. Crea un
+ * `http.Server` NUEVO por intento (reutilizar la misma instancia tras un evento
+ * 'error' de bind deja el server en un estado inconsistente). Bindea a AUTH_HOST
+ * (127.0.0.1 por defecto): el redirect_uri es localhost, así que no hay razón para
+ * exponer el callback a toda la red local durante la ventana de autenticación.
+ */
+async function listenOnAvailablePort(): Promise<{ server: http.Server; port: number } | null> {
+  for (const port of PORTS_TO_TRY) {
+    const server = http.createServer();
+    const ok = await new Promise<boolean>(resolve => {
+      server.once('error', () => resolve(false));
+      server.listen(port, AUTH_HOST, () => resolve(true));
+    });
+    if (ok) return { server, port };
+    // El bind falló (p. ej. EADDRINUSE): se descarta esta instancia y se prueba
+    // el siguiente puerto con una nueva. El listener 'error' era `once`, ya se quitó.
+    server.removeAllListeners();
+  }
+  return null;
 }
 
 async function exchangeCode(
@@ -123,19 +155,11 @@ async function runInteractiveLogin(): Promise<TokenData> {
   const { verifier, challenge } = generatePKCE();
   const state = crypto.randomBytes(16).toString('hex');
 
-  const server = http.createServer();
-  let listenPort: number | null = null;
-
-  for (const port of PORTS_TO_TRY) {
-    if (await tryListen(server, port)) {
-      listenPort = port;
-      break;
-    }
-  }
-
-  if (listenPort === null) {
+  const bound = await listenOnAvailablePort();
+  if (bound === null) {
     throw new Error('auth_port_unavailable');
   }
+  const { server, port: listenPort } = bound;
 
   const redirectUri = `http://localhost:${listenPort}/auth/callback`;
 
@@ -214,8 +238,27 @@ export async function getValidToken(): Promise<string | AuthError> {
     };
   }
 
-  let tokens = loadTokens();
+  // Fast path sin lock: si hay un token vigente (con 60s de margen) se devuelve ya.
+  const cached = loadTokens();
+  if (cached && cached.expiresAt > Date.now() + 60_000) {
+    return cached.accessToken;
+  }
 
+  // Slow path (refresh o login interactivo): single-flight. La primera llamada crea
+  // la Promise; las concurrentes la reusan. Se limpia al terminar para permitir un
+  // reintento posterior si esta resolución falló.
+  if (!inFlight) {
+    inFlight = resolveToken().finally(() => {
+      inFlight = null;
+    });
+  }
+  return inFlight;
+}
+
+async function resolveToken(): Promise<string | AuthError> {
+  // Re-chequea el fast path: otra llamada pudo renovar el token mientras esperábamos
+  // el lock (o entre el chequeo de getValidToken y la toma del single-flight).
+  let tokens = loadTokens();
   if (tokens && tokens.expiresAt > Date.now() + 60_000) {
     return tokens.accessToken;
   }

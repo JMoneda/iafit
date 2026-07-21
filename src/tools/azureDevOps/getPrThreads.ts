@@ -1,18 +1,15 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import { adoGet, isAzureError } from '../../utils/azureDevOpsClient.js';
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'get_pr_threads',
   description:
     'Devuelve todos los hilos de comentarios de un pull request, incluyendo comentarios de revisores y threads resueltos. Úsala para entender el estado de revisión de un PR.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      repository: { type: 'string', description: 'Nombre del repositorio.' },
-      pullRequestId: { type: 'number', description: 'ID del pull request.' },
-      project: { type: 'string', description: 'Proyecto de Azure DevOps (opcional).' },
-    },
-    required: ['repository', 'pullRequestId'],
+    repository: z.string().describe('Nombre del repositorio.'),
+    pullRequestId: z.number().describe('ID del pull request.'),
+    project: z.string().optional().describe('Proyecto de Azure DevOps (opcional).'),
   },
 };
 

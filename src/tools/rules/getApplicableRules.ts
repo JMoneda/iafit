@@ -1,4 +1,5 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import {
   getApplicableRules,
   isValidTag,
@@ -10,7 +11,7 @@ const TAGS_DOC = VALID_TAGS.filter(t => t !== 'all')
   .map(t => `"${t}" (${TAG_DESCRIPTIONS[t]})`)
   .join(', ');
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'get_applicable_rules',
   description:
     'Devuelve en UNA sola llamada todas las reglas ACTIVAS que aplican a un stack o ' +
@@ -23,25 +24,19 @@ export const definition: Tool = {
     'para un API. Empieza en mode="summary" (título + slug + excerpt) para decidir qué leer, ' +
     'y luego usa get_rule (o este mismo con mode="full") para el detalle de las que importan.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      tags: {
-        type: 'array',
-        items: { type: 'string', enum: VALID_TAGS.filter(t => t !== 'all') },
-        minItems: 1,
-        description:
-          'Tags del contexto de trabajo a matchear contra applies_to. No incluyas "all": ' +
-          'las reglas transversales entran solas.',
-      },
-      mode: {
-        type: 'string',
-        enum: ['summary', 'full'],
-        description:
-          'summary (default) = título, slug, applies_to y un excerpt de una línea, para ' +
+    tags: z
+      .array(z.string())
+      .describe(
+        'Tags del contexto de trabajo a matchear contra applies_to. No incluyas "all": ' +
+          `las reglas transversales entran solas. Válidos: ${VALID_TAGS.filter(t => t !== 'all').join(', ')}.`,
+      ),
+    mode: z
+      .string()
+      .optional()
+      .describe(
+        'summary (default) = título, slug, applies_to y un excerpt de una línea, para ' +
           'decidir sin saturar el contexto. full = contenido completo de cada regla.',
-      },
-    },
-    required: ['tags'],
+      ),
   },
 };
 

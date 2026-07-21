@@ -1,20 +1,17 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import { adoGet, isAzureError } from '../../utils/azureDevOpsClient.js';
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'get_work_item',
   description:
     'Lee un work item de Azure DevOps por su ID. Devuelve título, tipo, estado, asignado, descripción y criterios de aceptación. Úsala para entender el contexto de una tarea antes de implementar.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      id: { type: 'number', description: 'ID del work item.' },
-      project: {
-        type: 'string',
-        description: 'Proyecto de Azure DevOps. Si se omite, usa AZURE_DEVOPS_PROJECT.',
-      },
-    },
-    required: ['id'],
+    id: z.number().describe('ID del work item.'),
+    project: z
+      .string()
+      .optional()
+      .describe('Proyecto de Azure DevOps. Si se omite, usa AZURE_DEVOPS_PROJECT.'),
   },
 };
 

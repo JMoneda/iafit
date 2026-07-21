@@ -1,9 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
+import { z } from 'zod';
 
 /**
- * Contrato del catálogo de tools: nombres únicos, schemas bien formados y
- * el flag `confirmed` obligatorio en TODAS las tools de escritura.
+ * Contrato del catálogo de tools: nombres únicos, inputSchema como raw shape de zod
+ * bien formado y el flag `confirmed` obligatorio en TODAS las tools de escritura.
  * Este test protege contra regresiones al agregar tools nuevas.
+ *
+ * Tras la migración a McpServer + registerTool, `inputSchema` es un ZodRawShape
+ * (objeto plano de validadores zod), no un JSON Schema. Un campo es REQUERIDO si su
+ * validador no es opcional: lo comprobamos con safeParse(undefined) — un opcional
+ * acepta undefined; uno requerido lo rechaza.
  */
 async function loadAllTools() {
   vi.resetModules();
@@ -29,6 +35,11 @@ async function loadAllTools() {
 
 const TOOLS_DE_ESCRITURA = ['create_work_item', 'update_work_item', 'add_pr_comment'];
 
+/** Un campo del raw shape es requerido si su validador rechaza `undefined`. */
+function isRequired(field: unknown): boolean {
+  return !(field as z.ZodTypeAny).safeParse(undefined).success;
+}
+
 describe('catálogo de tools — contrato', () => {
   it('expone 14 tools con nombres únicos', async () => {
     const tools = await loadAllTools();
@@ -37,12 +48,17 @@ describe('catálogo de tools — contrato', () => {
     expect(new Set(nombres).size).toBe(14);
   });
 
-  it('toda tool tiene descripción, inputSchema tipo object y handler función', async () => {
+  it('toda tool tiene descripción, inputSchema raw shape de zod y handler función', async () => {
     const tools = await loadAllTools();
     for (const t of tools) {
       const d = t.definition;
       expect(d.description, `${d.name} sin descripción`).toBeTruthy();
-      expect((d.inputSchema as { type: string }).type).toBe('object');
+      // inputSchema es un objeto plano (ZodRawShape); puede ser {} para tools sin args.
+      expect(typeof d.inputSchema).toBe('object');
+      expect(d.inputSchema).not.toBeNull();
+      for (const [campo, validador] of Object.entries(d.inputSchema)) {
+        expect(validador instanceof z.ZodType, `${d.name}.${campo} no es un validador zod`).toBe(true);
+      }
       expect(typeof t.handler).toBe('function');
     }
   });
@@ -51,12 +67,9 @@ describe('catálogo de tools — contrato', () => {
     const tools = await loadAllTools();
     for (const nombre of TOOLS_DE_ESCRITURA) {
       const tool = tools.find(t => t.definition.name === nombre)!;
-      const schema = tool.definition.inputSchema as {
-        required?: string[];
-        properties?: Record<string, unknown>;
-      };
-      expect(schema.required, `${nombre} debe requerir confirmed`).toContain('confirmed');
-      expect(schema.properties?.confirmed).toBeDefined();
+      const shape = tool.definition.inputSchema;
+      expect(shape.confirmed, `${nombre} debe declarar confirmed`).toBeDefined();
+      expect(isRequired(shape.confirmed), `${nombre} debe requerir confirmed`).toBe(true);
       expect(tool.definition.description).toMatch(/CONFIRMACIÓN EXPLÍCITA/);
     }
   });
@@ -65,8 +78,7 @@ describe('catálogo de tools — contrato', () => {
     const tools = await loadAllTools();
     for (const t of tools) {
       if (TOOLS_DE_ESCRITURA.includes(t.definition.name)) continue;
-      const schema = t.definition.inputSchema as { required?: string[] };
-      expect(schema.required ?? []).not.toContain('confirmed');
+      expect(t.definition.inputSchema.confirmed, `${t.definition.name} no debe pedir confirmed`).toBeUndefined();
     }
   });
 });

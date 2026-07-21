@@ -1,8 +1,9 @@
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import { z } from 'zod';
+import type { ToolDefinition } from '../types.js';
 import { isValidCategory, searchRules, VALID_CATEGORIES } from '../../utils/rulesReader.js';
 import type { Category } from '../../utils/rulesReader.js';
 
-export const definition: Tool = {
+export const definition: ToolDefinition = {
   name: 'search_rules',
   description:
     'Busca por TOKENS con ranking en todas las reglas (insensible a mayúsculas y acentos). ' +
@@ -14,28 +15,20 @@ export const definition: Tool = {
     'fragmentos, score, applies_to y status. Por defecto excluye reglas obsoletas ' +
     '(deprecated/superseded).',
   inputSchema: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'Texto a buscar; se parte en palabras (tokens).',
-      },
-      category: {
-        type: 'string',
-        enum: [...VALID_CATEGORIES],
-        description: 'Limitar la búsqueda a una categoría específica (opcional, ver list_rule_categories).',
-      },
-      limit: {
-        type: 'number',
-        description: 'Máximo de resultados a devolver (default 10).',
-      },
-      include_inactive: {
-        type: 'boolean',
-        description:
-          'Incluir reglas deprecated/superseded (default false: no se sugieren reglas obsoletas).',
-      },
-    },
-    required: ['query'],
+    query: z.string().describe('Texto a buscar; se parte en palabras (tokens).'),
+    category: z
+      .string()
+      .optional()
+      .describe(
+        `Limitar la búsqueda a una categoría específica (opcional, ver list_rule_categories). Válidas: ${VALID_CATEGORIES.join(', ')}.`,
+      ),
+    limit: z.number().optional().describe('Máximo de resultados a devolver (default 10).'),
+    include_inactive: z
+      .boolean()
+      .optional()
+      .describe(
+        'Incluir reglas deprecated/superseded (default false: no se sugieren reglas obsoletas).',
+      ),
   },
 };
 
