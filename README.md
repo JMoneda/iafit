@@ -17,9 +17,9 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 | Tool | Qué hace |
 |------|----------|
 | `list_rule_categories` | Lista las categorías de reglas y cuántas hay en cada una |
-| `list_rules` | Lista las reglas de una categoría |
-| `get_rule` | Devuelve el contenido completo de una regla |
-| `search_rules` | Búsqueda por texto libre en todas las reglas |
+| `list_rules` | Lista las reglas de una categoría (omite obsoletas salvo `include_inactive`) |
+| `get_rule` | Devuelve el contenido completo de una regla (avisa si está obsoleta y a qué fue reemplazada) |
+| `search_rules` | Búsqueda por tokens con ranking en todas las reglas (relevancia, `limit`, `include_inactive`) |
 | `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT |
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
 | `get_work_item` · `query_work_items` | Azure DevOps: work items |
@@ -171,6 +171,15 @@ Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías 
 **Agregar una regla:** crea `rules/<categoría>/<slug>.md` con frontmatter
 (`title`, `category`, `slug`, `version`, `last_updated`, `applies_to`, `status`) y
 actualiza el `_index.md` de la categoría.
+
+**Ciclo de vida (`status`) y búsqueda:** el `status` puede ser `active` (default), `draft`,
+`deprecated` o `superseded`. Las reglas `deprecated`/`superseded` **no se listan ni se
+devuelven en búsquedas por defecto** (para no sugerir reglas obsoletas); pasa
+`include_inactive: true` a `list_rules`/`search_rules` para verlas. Cuando marques una regla
+como obsoleta, añade `superseded_by: "categoria:slug"` (o `"slug"`) apuntando a la vigente:
+`get_rule` mostrará un aviso que redirige a ella. La búsqueda de `search_rules` es **por
+tokens con ranking** (título pesa más que `applies_to`, y este más que el cuerpo; casar
+todos los términos rankea por encima de casar solo uno), insensible a acentos y mayúsculas.
 
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).
@@ -358,10 +367,11 @@ Cobertura por área:
 
 | Archivo | Qué protege |
 |---------|-------------|
-| `tests/rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda insensible a acentos/mayúsculas |
+| `tests/rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, y búsqueda por tokens con ranking (insensible a acentos/mayúsculas, cobertura, `limit`) |
 | `tests/schemasReader.test.ts` | Listado, descripción plegada, obtención con plantillas, rechazo de path traversal |
 | `tests/tokenStore.test.ts` | Cifrado (roundtrip, sin secretos en claro, detección de manipulación), `clearTokens` |
 | `tests/azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
 | `tests/confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
 | `tests/toolDefinitions.test.ts` | Catálogo: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
 | `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+| `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by` |

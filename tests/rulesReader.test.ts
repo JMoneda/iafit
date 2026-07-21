@@ -37,10 +37,8 @@ describe('rulesReader — categorías', () => {
 
   it('cuenta reglas por categoría excluyendo _index.md', async () => {
     const m = await loadReader();
-    // fixtures/security tiene 2 reglas + _index.md (que no cuenta)
     expect(m.countRulesInCategory('security')).toBe(2);
     expect(m.countRulesInCategory('architecture')).toBe(1);
-    // categoría válida sin directorio en fixtures → 0, sin lanzar excepción
     expect(m.countRulesInCategory('cicd')).toBe(0);
   });
 });
@@ -63,7 +61,6 @@ describe('rulesReader — listado y lectura', () => {
     const m = await loadReader();
     const rules = m.listRulesInCategory('security');
     const sinSlug = rules.find(r => r.slug === 'sin-slug')!;
-    // slug derivado del nombre de archivo, defaults de status y applies_to
     expect(sinSlug.status).toBe('active');
     expect(sinSlug.applies_to).toEqual(['all']);
   });
@@ -91,19 +88,22 @@ describe('rulesReader — listado y lectura', () => {
   });
 });
 
-describe('rulesReader — búsqueda', () => {
-  it('encuentra coincidencias exactas y devuelve excerpt con contexto', async () => {
+describe('rulesReader — búsqueda por tokens', () => {
+  it('encuentra coincidencias y devuelve excerpt con contexto', async () => {
     const m = await loadReader();
     const matches = m.searchRules('Key Vault');
     expect(matches).toHaveLength(1);
     expect(matches[0].slug).toBe('gestion-secretos');
     expect(matches[0].category).toBe('security');
     expect(matches[0].excerpt).toContain('Key Vault');
+    // nuevos campos del match rankeado
+    expect(matches[0].score).toBeGreaterThan(0);
+    expect(matches[0].applies_to).toEqual(['backend']);
+    expect(matches[0].status).toBe('active');
   });
 
   it('es insensible a mayúsculas y a acentos (migracion ≡ Migración)', async () => {
     const m = await loadReader();
-    // el fixture contiene "Migración" con tilde y mayúscula
     for (const q of ['migracion', 'MIGRACIÓN', 'Migración', 'migraciÓn']) {
       const matches = m.searchRules(q);
       expect(matches.length, `query '${q}' debería encontrar la regla`).toBe(1);
@@ -119,8 +119,8 @@ describe('rulesReader — búsqueda', () => {
 
   it('respeta el filtro por categoría', async () => {
     const m = await loadReader();
-    expect(m.searchRules('capas', 'architecture')).toHaveLength(1);
-    expect(m.searchRules('capas', 'security')).toHaveLength(0);
+    expect(m.searchRules('capas', { category: 'architecture' })).toHaveLength(1);
+    expect(m.searchRules('capas', { category: 'security' })).toHaveLength(0);
   });
 
   it('query vacía o de solo espacios no devuelve resultados', async () => {
@@ -131,6 +131,24 @@ describe('rulesReader — búsqueda', () => {
 
   it('no busca dentro de los _index.md', async () => {
     const m = await loadReader();
-    expect(m.searchRules('debe excluirse')).toHaveLength(0);
+    expect(m.searchRules('excluirse')).toHaveLength(0);
+  });
+
+  it('rankea: título pesa más que cuerpo (multi-término y cobertura)', async () => {
+    const m = await loadReader();
+    // "secretos" está en el título de gestion-secretos → score alto
+    const matches = m.searchRules('secretos');
+    expect(matches[0].slug).toBe('gestion-secretos');
+    // dos términos, ambos presentes → mayor score que uno solo
+    const dos = m.searchRules('secretos credencial')[0].score;
+    const uno = m.searchRules('credencial')[0].score;
+    expect(dos).toBeGreaterThan(uno);
+  });
+
+  it('respeta el limit', async () => {
+    const m = await loadReader();
+    // "de" aparece en ambas reglas de security y en architecture; limit=1 → 1 resultado
+    const matches = m.searchRules('de', { limit: 1 });
+    expect(matches).toHaveLength(1);
   });
 });
