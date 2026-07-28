@@ -169,7 +169,7 @@ Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías 
 | Categoría | Contenido |
 |-----------|-----------|
 | `architecture` | Clean Architecture .NET, Frontend SPA Angular, plataforma Azure |
-| `code-standards` | .NET, Angular, TypeScript |
+| `code-standards` | .NET, Angular, TypeScript, **README al día en cada cambio** (transversal: todo cambio actualiza el README de su app o no está terminado) |
 | `security` | Identidad/acceso (Entra ID, RBAC, MSI), secretos (Key Vault), red/perímetro (Front Door + WAF) |
 | `observabilidad` | Logging y auditoría con Application Insights |
 | `pruebas` | Pruebas unitarias (xUnit, Moq) y calidad (SonarQube) |
