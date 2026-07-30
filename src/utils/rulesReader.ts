@@ -15,7 +15,8 @@ export type Category =
   | 'migration'
   | 'observabilidad'
   | 'pruebas'
-  | 'cicd';
+  | 'cicd'
+  | 'sdd';
 
 export const VALID_CATEGORIES: Category[] = [
   'architecture',
@@ -26,6 +27,7 @@ export const VALID_CATEGORIES: Category[] = [
   'observabilidad',
   'pruebas',
   'cicd',
+  'sdd',
 ];
 
 export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
@@ -37,6 +39,7 @@ export const CATEGORY_DESCRIPTIONS: Record<Category, string> = {
   observabilidad: 'Logging, telemetría, auditoría y monitoreo',
   pruebas: 'Estándares de pruebas y calidad de código',
   cicd: 'CI/CD, DevOps e Infraestructura como Código',
+  sdd: 'Desarrollo guiado por especificación (OpenSpec / SpecKit): invariantes, elección de framework y constitución institucional heredable',
 };
 
 export function isValidCategory(cat: string): cat is Category {

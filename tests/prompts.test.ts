@@ -12,12 +12,13 @@ async function loadPrompts() {
 }
 
 describe('catálogo de prompts', () => {
-  it('registra iafit-inicio, iafit-migracion e iafit-desarrollo con nombres únicos', async () => {
+  it('registra iafit-inicio, iafit-migracion, iafit-desarrollo e iafit-sdd con nombres únicos', async () => {
     const { prompts, promptMap } = await loadPrompts();
     const nombres = prompts.map(p => p.name);
     expect(nombres).toContain('iafit-inicio');
     expect(nombres).toContain('iafit-migracion');
     expect(nombres).toContain('iafit-desarrollo');
+    expect(nombres).toContain('iafit-sdd');
     expect(new Set(nombres).size).toBe(nombres.length);
     for (const n of nombres) expect(promptMap.get(n)).toBeDefined();
   });
@@ -57,5 +58,55 @@ describe('prompt iafit-inicio', () => {
     const texto = inicio.build().messages[0].content.text;
     expect(texto).toContain('iafit-desarrollo');
     expect(texto).toContain('iafit-migracion');
+  });
+
+  it('ofrece el camino SDD y lo enruta a iafit-sdd', async () => {
+    const { inicio } = await import('../src/prompts/inicio.js');
+    const texto = inicio.build().messages[0].content.text;
+    expect(texto).toContain('iafit-sdd');
+  });
+});
+
+describe('prompt iafit-sdd', () => {
+  /**
+   * El valor de este prompt está en NO hardcodear el catálogo: si enumera los
+   * schemas o las reglas en su texto, queda desactualizado a la primera adición.
+   * Estos tests fijan ese contrato.
+   */
+  it('consulta el catálogo real al MCP en vez de enumerarlo', async () => {
+    const { sdd } = await import('../src/prompts/sdd.js');
+    const texto = sdd.build().messages[0].content.text;
+    expect(texto).toContain('list_schemas');
+    expect(texto).toMatch(/list_rules|get_applicable_rules/);
+    expect(texto).toMatch(/NUNCA hardcodees|no de tu memoria/i);
+  });
+
+  it('detecta los cuatro casos posibles, incluido el conflicto de ambas raíces', async () => {
+    const { sdd } = await import('../src/prompts/sdd.js');
+    const texto = sdd.build().messages[0].content.text;
+    expect(texto).toContain('openspec/config.yaml');
+    expect(texto).toContain('.specify/');
+    expect(texto).toContain('CONFLICTO');
+  });
+
+  it('enruta la conversión al schema en vez de improvisarla, y advierte de la pérdida', async () => {
+    const { sdd } = await import('../src/prompts/sdd.js');
+    const texto = sdd.build().messages[0].content.text;
+    expect(texto).toContain('cambio-de-framework-sdd');
+    expect(texto).toMatch(/NO improvises/i);
+    expect(texto).toContain('equivalencias-openspec-speckit');
+  });
+
+  it('no actúa sin confirmación y avisa de que /speckit.constitution sobrescribe', async () => {
+    const { sdd } = await import('../src/prompts/sdd.js');
+    const texto = sdd.build().messages[0].content.text;
+    expect(texto).toMatch(/sin confirmación explícita/i);
+    expect(texto).toContain('/speckit.constitution');
+    expect(texto).toMatch(/SOBRESCRIBE/i);
+  });
+
+  it('se redacta en español', async () => {
+    const { sdd } = await import('../src/prompts/sdd.js');
+    expect(sdd.build().messages[0].content.text).toContain('ESPAÑOL');
   });
 });

@@ -32,9 +32,10 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 
 | Prompt | Qué hace |
 |--------|----------|
-| `iafit-inicio` | Saludo y orientación (desarrollar vs migrar) |
+| `iafit-inicio` | Saludo y orientación (desarrollar, migrar o SDD) |
 | `iafit-desarrollo` | Onboarding de desarrollo: detecta el stack, confirma el contexto y carga las reglas aplicables (`get_applicable_rules`) antes de escribir código |
 | `iafit-migracion` | Onboarding de migración: entrevista, configura OpenSpec y arranca las fases |
+| `iafit-sdd` | Catálogo y enrutador de SDD: detecta si el proyecto usa **OpenSpec o SpecKit**, consulta el catálogo real y ofrece instalar schemas, instalar la constitución institucional o convertir entre frameworks |
 
 > Nota: los clientes MCP soportan **tools** de forma universal; el soporte de **prompts**
 > es más nuevo en VS Code/Copilot. Las tools funcionan en todos.
@@ -177,6 +178,7 @@ nuevas, y no afectan al `slug` (ver *Archivar una regla reemplazada*). Categorí
 | `pruebas` | Pruebas unitarias (xUnit, Moq) y calidad (SonarQube) |
 | `cicd` | CI/CD con Azure DevOps (pipelines, Bicep, ACR) |
 | `adrs` | Architecture Decision Records |
+| `sdd` | Desarrollo guiado por especificación: invariantes comunes, elección entre **OpenSpec y SpecKit**, equivalencias/pérdida al convertir, y la **constitución institucional** heredable por proyectos SpecKit |
 | `migration` | Convención de ramas, proceso, **preservar comportamiento** (actualizar sin alterar conexiones/lógica), **línea base compila** (verificar build antes de migrar), **línea base de contrato** (snapshots del API + diff por salto), **compuertas de salto** (definition of done por salto), **reversibilidad por salto** (commit aislado + rollback), **verificar fuente oficial** (re-confirmar EOL/breaking changes contra la doc oficial), **serialización como vector de ruptura** (Newtonsoft → System.Text.Json), matriz Angular (`angular-a-13…22`), matriz .NET (`dotnet-a-5…10`, ruta `3.1→…→10`), **Azure Functions** (`azure-functions-a-v4-inproc` → `azure-functions-a-isolated`), documentación estilo walkthrough, **sugerencias de refactor** al cierre (vulnerabilidades/mejoras → changes/HU futuros), **documentación del API** al cerrar el apply (README + Swagger/OpenAPI, implementarlo si falta) |
 
 **Agregar una regla:** crea `rules/<categoría>/<slug>.md` con frontmatter
@@ -208,6 +210,36 @@ con `get_rule` y con `list_rules`/`search_rules` + `include_inactive: true`, y s
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).
 
+### SDD: OpenSpec y SpecKit
+
+Los proyectos EAFIT trabajan con desarrollo guiado por especificación, y conviven dos
+frameworks. La categoría `sdd` fija lo que **no** depende de cuál se use:
+
+| Regla | Para qué |
+|-------|----------|
+| `invariantes-sdd` | Los cinco invariantes que cumplen ambos frameworks (spec antes que código, requisitos verificables, spec como línea base viva, español, reglas por encima de la spec) |
+| `eleccion-de-framework` | Cuándo OpenSpec y cuándo SpecKit. **OpenSpec es el default institucional**; SpecKit es válido pero se justifica por escrito. Prohibido tener ambos en el mismo repo |
+| `equivalencias-openspec-speckit` | Mapeo artefacto por artefacto y, sobre todo, **qué se pierde al convertir** en cada sentido |
+| `constitucion-institucional` | Un `constitution.md` completo, listo para copiar a `.specify/memory/constitution.md` |
+
+**El modelo:** `rules/` y `schemas/` son la capa duradera; OpenSpec y SpecKit son
+*renderizadores*. Cambiar de framework es volver a renderizar, no reescribir el
+conocimiento. Por eso la conversión solo pone en riesgo los artefactos del cambio en
+vuelo, no el patrimonio de especificaciones.
+
+**La constitución** existe porque SpecKit tiene una pieza que OpenSpec no tiene: un
+documento versionado que `plan` y `tasks` leen en runtime y que `/speckit.analyze` valida
+antes de implementar. Es el único punto donde se puede inyectar gobernanza que la
+herramienta haga cumplir sola — y de paso se le transplanta el invariante que a SpecKit le
+falta de fábrica: la spec como línea base viva, que en OpenSpec resuelve `openspec archive`.
+Se obtiene con `get_rule(category="sdd", slug="constitucion-institucional")` y su `version`
+de frontmatter es lo que permite detectar drift contra la copia del proyecto.
+
+> **Vigencia:** comandos y rutas de ambos frameworks verificados contra la documentación
+> oficial el 2026-07-30 (SpecKit usa comandos namespaced `/speckit.*`; OpenSpec usa
+> `openspec/config.yaml`). Ambos se mueven rápido: reconfirma contra la CLI instalada,
+> según `migration:verificar-fuente-oficial`.
+
 ### Tags de `applies_to` (vocabulario cerrado)
 
 El campo `applies_to` del frontmatter usa un **vocabulario cerrado** de tags, definido en
@@ -231,15 +263,22 @@ Una regla sin `applies_to` se trata como `["all"]`. Para **añadir un tag nuevo*
 `VALID_TAGS` (y su descripción en `TAG_DESCRIPTIONS`) — es un cambio deliberado, no un valor
 libre que se cuela por un typo.
 
-## Schemas de migración (OpenSpec)
+## Schemas (OpenSpec)
 
-IAFIT provee tres schemas en `schemas/`, servibles vía `get_schema`:
+IAFIT provee cuatro schemas en `schemas/`, servibles vía `get_schema`:
 
 | Schema | Fase | Produce |
 |--------|------|---------|
 | `inventario-tecnico` | 0–1 — arranque + inventario (solo lectura) | `estado-ramas.md` (dev vs master) → `inventario.md` → `ruta.md` |
 | `research` | 2 — comprensión (solo lectura) | `scope.md` → `walkthrough.md` → specs |
 | `migracion-incremental` | 3 — ejecutar un salto | `plan.md` → `tasks.md` (+ `notas-migracion.md`) |
+| `cambio-de-framework-sdd` | transversal — convertir entre OpenSpec y SpecKit | `inventario.md` → `mapeo.md` → `plan-conversion.md` |
+
+`cambio-de-framework-sdd` es al que enruta el prompt `iafit-sdd` cuando se pide cambiar de
+framework. Su artefacto central es `mapeo.md`, cuya sección **"qué se pierde"** es
+obligatoria: una pérdida sin decisión registrada bloquea el paso al plan. La fase `apply`
+construye el destino y **verifica el recuento de requisitos contra el inventario antes de
+retirar el origen**, que es el punto de no retorno.
 
 ### Instalación global de los schemas (una vez)
 
@@ -248,7 +287,7 @@ de OpenSpec (Windows):
 
 ```bash
 cp -r schemas/research schemas/inventario-tecnico schemas/migracion-incremental \
-  "$LOCALAPPDATA/openspec/schemas/"
+  schemas/cambio-de-framework-sdd "$LOCALAPPDATA/openspec/schemas/"
 openspec schema validate inventario-tecnico   # verifica
 ```
 

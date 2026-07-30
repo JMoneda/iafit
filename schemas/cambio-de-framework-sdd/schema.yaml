@@ -1,0 +1,189 @@
+name: cambio-de-framework-sdd
+version: 1
+description: >
+  Flujo para CONVERTIR un proyecto entre OpenSpec y SpecKit (en cualquier sentido).
+  Produce inventario.md (qué existe hoy) -> mapeo.md (destino de cada artefacto y,
+  sobre todo, QUÉ SE PIERDE) -> plan-conversion.md (orden, verificación y reversión).
+  La fase apply ejecuta la conversión y verifica que ningún requisito quedó huérfano.
+  Los dos modelos NO son isomorfos: la conversión pierde información y este flujo
+  existe para que la pérdida sea una decisión registrada y no un accidente. Consulta
+  la regla 'equivalencias-openspec-speckit' del MCP antes de empezar.
+  IMPORTANTE: TODOS los artefactos se redactan en ESPAÑOL.
+artifacts:
+  - id: inventario
+    generates: inventario.md
+    description: Qué hay hoy en el framework de origen, contado y ubicado
+    template: inventario.md
+    instruction: >
+      Levanta el inventario del estado ACTUAL antes de decidir nada. Es solo lectura:
+      no muevas ni edites ningún archivo en este paso. Redacta TODO en español.
+
+
+      Antes de escribir, consulta el MCP IAFIT:
+      get_rule(category="sdd", slug="equivalencias-openspec-speckit") y
+      get_rule(category="sdd", slug="invariantes-sdd").
+
+
+      Detecta el sentido de la conversión mirando el repo: 'openspec/' (con
+      config.yaml, specs/, changes/) indica OpenSpec; '.specify/' indica SpecKit. Si
+      existen AMBOS, estás ante el caso de conflicto de la regla
+      'eleccion-de-framework': dilo explícitamente y trata cada raíz como un origen
+      distinto en el inventario.
+
+
+      Secciones:
+
+      - **Sentido**: origen → destino, y por qué se convierte (una frase).
+
+      - **Raíz de origen**: rutas concretas encontradas y qué hay en cada una.
+
+      - **Capacidades especificadas**: en OpenSpec, un ítem por carpeta de
+      openspec/specs/<capacidad>/ con el número de requisitos que contiene. En
+      SpecKit, un ítem por carpeta specs/<###-nombre>/ con qué artefactos tiene
+      (spec.md, plan.md, tasks.md, research.md, data-model.md, contracts/).
+
+      - **Trabajo en vuelo**: cambios/features SIN cerrar. Son el mayor riesgo de la
+      conversión: conviene cerrarlos o congelarlos ANTES de convertir, no durante.
+
+      - **Historial**: en OpenSpec, cuántos cambios hay en changes/archive/. En
+      SpecKit, qué features ya están implementadas.
+
+      - **Personalizaciones**: schemas custom en openspec/schemas/, o presets y
+      extensions instalados en SpecKit. Se convierten aparte y suelen olvidarse.
+
+      - **Gobernanza**: si hay .specify/memory/constitution.md, qué versión declara.
+
+
+      CUENTA de verdad (ejecuta comandos: 'ls', 'find', 'grep -c'). No estimes: el
+      recuento de requisitos del inventario es lo que después permite verificar que
+      ninguno se perdió.
+    requires: []
+  - id: mapeo
+    generates: mapeo.md
+    description: Destino de cada artefacto y declaración explícita de la pérdida
+    template: mapeo.md
+    instruction: >
+      Decide el destino de CADA artefacto del inventario y declara qué se pierde.
+      Este es el artefacto central del cambio: si está flojo, la conversión rompe
+      cosas en silencio. Sigue siendo solo lectura. Redacta TODO en español.
+
+
+      Usa la tabla de equivalencias de la regla
+      'equivalencias-openspec-speckit' como base, pero resuélvela para ESTE
+      proyecto: la tabla dice qué corresponde a qué en general; tú dices qué pasa con
+      cada archivo que existe aquí.
+
+
+      Secciones:
+
+      - **Mapeo artefacto por artefacto**: una fila por artefacto del inventario, con
+      origen → destino concreto (ruta final). Todo artefacto del inventario aparece
+      aquí: sin excepciones y sin filas "varios".
+
+      - **Qué se pierde**: la sección OBLIGATORIA. Para cada pérdida: qué se pierde,
+      por qué el destino no lo soporta, y QUÉ DECIDIMOS hacer (conservar como anexo,
+      documentar y descartar, migrar a otro mecanismo). Una pérdida sin decisión
+      registrada bloquea el paso a plan-conversion.
+
+      - **Requisitos**: cómo se preserva cada requisito. Si el destino es SpecKit, di
+      dónde vivirá la baseline (la recomendación institucional es CONSERVARLA;
+      descartarla exige aprobación arquitectural). Si el destino es OpenSpec, di cómo
+      se sintetiza la baseline desde las features y cómo se resuelven las
+      contradicciones entre features que tocan la misma capacidad.
+
+      - **Gobernanza en destino**: si vas a SpecKit, la constitución institucional se
+      instala como parte de la conversión (regla 'constitucion-institucional'). Si
+      vas a OpenSpec, di qué reglas del MCP sustituyen a los principios que la
+      constitución imponía.
+
+      - **Formato de requisitos**: confirma que los requisitos convertidos mantienen
+      'SHALL/MUST' + escenario con EXACTAMENTE 4 numerales ('#### Scenario:'). Con 3
+      numerales o viñetas, OpenSpec no los cuenta y la pérdida es silenciosa.
+
+
+      CONTROL-STOP: si al mapear descubres que una decisión excede tu criterio (p. ej.
+      descartar la baseline), DETENTE y pregunta al usuario. No la tomes por defecto.
+    requires:
+      - inventario
+  - id: plan-conversion
+    generates: plan-conversion.md
+    description: Orden de ejecución, verificación y reversión
+    template: plan-conversion.md
+    instruction: >
+      Convierte el mapeo en un plan ejecutable. Redacta TODO en español.
+
+
+      Secciones:
+
+      - **Precondiciones**: qué debe estar cierto antes de tocar nada. Como mínimo:
+      trabajo en vuelo cerrado o congelado, árbol de git limpio, y rama dedicada
+      creada (consulta la regla 'convencion-ramas' del MCP para el nombre).
+
+      - **Orden de ejecución**: pasos numerados. Regla de oro: **primero se crea la
+      estructura destino y se copia, y solo al final se retira la de origen**. Nunca
+      borres el origen a mitad de la conversión: es lo único que permite comparar.
+
+      - **Verificación**: cómo se comprueba que no se perdió nada. Obligatorio: el
+      recuento de requisitos del destino cuadra con el del inventario, o cada
+      diferencia está explicada en "qué se pierde". Incluye el comando de validación
+      del destino ('openspec validate' o '/speckit.analyze').
+
+      - **Reversión**: la rama dedicada es la reversión natural. Indica el punto de no
+      retorno (el commit que retira la raíz de origen) y qué hacer si algo falla
+      después.
+
+      - **Cierre**: actualizar el README declarando el nuevo framework (regla
+      'eleccion-de-framework'), y si el destino es SpecKit, dejar instalada la
+      constitución con su cabecera de trazabilidad.
+
+
+      CONTROL-STOP tras escribir plan-conversion.md. NO comiences la conversión ni
+      pases a la fase apply por tu cuenta. La dispara EXPLÍCITAMENTE el usuario.
+    requires:
+      - mapeo
+apply:
+  requires:
+    - plan-conversion
+  instruction: |
+    PUERTA — lee antes de hacer nada:
+    No empieces a convertir como continuación automática de haber escrito
+    plan-conversion.md. Continúa SÓLO si el usuario pidió explícitamente ejecutar
+    ESTA conversión en este turno. Si llegaste aquí justo después de generar el plan,
+    DETENTE y pide confirmación.
+
+    Ejecuta la conversión siguiendo plan-conversion.md, y redacta TODO en español.
+
+    1) Precondiciones
+    - Verifica árbol de git limpio y trabajo en vuelo cerrado o congelado.
+    - Crea la rama dedicada. Si ya existe trabajo sin commitear, DETENTE.
+
+    2) Construye el destino SIN retirar el origen
+    - Crea la estructura destino y escribe los artefactos convertidos según mapeo.md.
+    - Conserva el formato de requisitos: 'SHALL/MUST' y escenarios con EXACTAMENTE 4
+      numerales. Revisa esto explícitamente: es el error que pasa desapercibido.
+    - Si el destino es SpecKit, instala la constitución institucional
+      (get_rule category="sdd" slug="constitucion-institucional") con su cabecera de
+      trazabilidad ANTES de la primera feature. Avisa al usuario de que ejecutar
+      '/speckit.constitution' después sobrescribiría el archivo.
+    - Si el destino es OpenSpec, instala los schemas necesarios en
+      openspec/schemas/ (list_schemas + get_schema) y asegura en config.yaml, en
+      'context', la línea: "Genera TODOS los artefactos y la documentación en español."
+
+    3) Verifica ANTES de retirar el origen
+    - Cuenta los requisitos del destino y compáralos con el inventario. Cada
+      diferencia debe estar explicada en la sección "qué se pierde" de mapeo.md; si
+      aparece una que no estaba prevista, DETENTE y actualiza el mapeo.
+    - Ejecuta la validación del destino ('openspec validate' o '/speckit.analyze') y
+      déjala en verde.
+
+    4) Retira el origen (punto de no retorno)
+    - Solo con la verificación en verde, retira la raíz de origen en su PROPIO commit,
+      para que revertirlo sea un solo 'git revert'.
+
+    5) Cierre
+    - Actualiza el README: qué framework usa ahora el proyecto y, si es SpecKit, por
+      qué y de qué versión de la constitución deriva (regla 'documentacion-readme').
+    - Deja un resumen de la conversión: qué se movió, qué se perdió y qué se decidió.
+
+    Haz pausa para revisión entre el paso 3 y el 4. El paso 4 es irreversible dentro
+    de la rama y no debe ejecutarse en el mismo turno sin confirmación.
