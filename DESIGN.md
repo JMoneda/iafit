@@ -6,13 +6,15 @@
 
 | Tool | Propósito |
 |------|-----------|
-| `list_rule_categories` | Lista las categorías disponibles con un resumen de cuántos archivos hay en cada una |
-| `list_rules` | Lista los archivos de una categoría con título y descripción breve |
-| `get_rule` | Devuelve el contenido completo de un archivo de reglas por categoría y slug |
-| `search_rules` | Búsqueda por texto libre (insensible a mayúsculas y acentos) sobre todos los archivos de reglas — devuelve fragmentos relevantes con contexto |
+| `list_rule_categories` | Lista las categorías disponibles con cuántas reglas **activas** hay en cada una (`count`) y cuántas archivadas (`inactive`) |
+| `list_rules` | Lista los archivos de una categoría con título y descripción breve; omite obsoletas salvo `include_inactive` |
+| `get_rule` | Devuelve el contenido completo de un archivo de reglas por categoría y slug; si está obsoleta, antepone un aviso que redirige a la vigente |
+| `search_rules` | Búsqueda por **tokens con ranking** (insensible a mayúsculas y acentos) sobre todos los archivos de reglas — devuelve fragmentos relevantes con contexto y `score` |
+| `get_applicable_rules` | Devuelve en UNA llamada todas las reglas activas que aplican a un conjunto de tags de contexto; atajo para arrancar una tarea sin encadenar list→get |
 
 Las categorías (todas con el mismo peso, sin jerarquía entre ellas) son: `architecture`,
-`code-standards`, `adrs`, `security`, `migration`, `observabilidad`, `pruebas`, `cicd`.
+`code-standards`, `adrs`, `security`, `migration`, `observabilidad`, `pruebas`, `cicd`,
+`sdd`.
 
 ### Grupo A-bis: Schemas de OpenSpec
 
@@ -20,6 +22,9 @@ Las categorías (todas con el mismo peso, sin jerarquía entre ellas) son: `arch
 |------|-----------|
 | `list_schemas` | Lista los schemas de OpenSpec que IAFIT provee (nombre, versión, descripción) |
 | `get_schema` | Devuelve el `schema.yaml` y todas las plantillas de un schema, para instalarlo en el proyecto destino |
+
+Los schemas cubren el flujo de migración (`inventario-tecnico`, `research`,
+`migracion-incremental`) y la conversión entre frameworks SDD (`cambio-de-framework-sdd`).
 
 ### Grupo B: Azure DevOps
 
@@ -42,12 +47,14 @@ Las categorías (todas con el mismo peso, sin jerarquía entre ellas) son: `arch
 
 ### Prompts
 
-Además de las tools, IAFIT expone dos prompts MCP que orientan al agente:
+Además de las tools, IAFIT expone cuatro prompts MCP que orientan al agente:
 
 | Prompt | Propósito |
 |--------|-----------|
-| `iafit-inicio` | Saludo inicial — confirma que IAFIT está activo y orienta al usuario (desarrollar o migrar) |
+| `iafit-inicio` | Saludo inicial — confirma que IAFIT está activo y orienta al usuario (desarrollar, migrar o SDD) |
+| `iafit-desarrollo` | Onboarding de desarrollo — detecta el stack y carga las reglas aplicables antes de escribir código |
 | `iafit-migracion` | Onboarding de migración — conduce la entrevista, configura schemas y arranca las fases en español |
+| `iafit-sdd` | Catálogo y enrutador de SDD — detecta si el proyecto usa OpenSpec o SpecKit y ofrece instalar schemas, instalar la constitución o convertir entre frameworks |
 
 ---
 
@@ -76,10 +83,19 @@ rules/
 ├── pruebas/
 │   ├── _index.md
 │   └── *.md
-└── cicd/
+├── cicd/
+│   ├── _index.md
+│   └── *.md
+└── sdd/
     ├── _index.md
-    └── *.md
+    └── *.md          # invariantes, elección de framework, equivalencias y constitución institucional
 ```
+
+El lector recorre cada categoría **recursivamente**: una subcarpeta es organización del
+corpus, no una categoría nueva, y **no afecta al `slug`**. La convención en uso es
+`<categoría>/superseded/` para archivar reglas reemplazadas (p. ej.
+`adrs/superseded/0001-use-postgres.md`), que así siguen siendo consultables por
+trazabilidad y sus wikilinks siguen resolviendo.
 
 ### Formato de cada archivo
 
@@ -90,8 +106,9 @@ category: security
 slug: secrets-management
 version: "1.2"
 last_updated: "2026-06-15"
-applies_to: ["all"]
-status: active             # active | deprecated | draft
+applies_to: ["all"]        # vocabulario CERRADO: VALID_TAGS en src/utils/rulesReader.ts
+status: active             # active | draft | deprecated | superseded
+superseded_by: ""          # solo si deprecated/superseded: "categoria:slug" o "slug"
 ---
 
 ## Regla
@@ -105,9 +122,18 @@ status: active             # active | deprecated | draft
 El `_index.md` de cada categoría lista los slugs disponibles con título y resumen de una línea.
 El versionado es el historial de git — no hay sistema de versiones propio en el MVP.
 
+`applies_to` usa un **vocabulario cerrado** (`VALID_TAGS`): `all`, `backend`, `frontend`,
+`data`, `dotnet`, `angular`, `typescript`, `libreria`, `sdd`. Es lo que hace confiable el
+filtrado de `get_applicable_rules`: con valores libres, un `net` frente a un `dotnet`
+fallaría en silencio. `sdd` es un tag de **contexto**, no de stack — SDD es opt-in, así que
+esas reglas solo aparecen si se pide el tag explícitamente.
+
 > La integridad de este contenido (frontmatter válido, `category` coincidente con la
-> carpeta, slug con formato `[a-z0-9-]`, `status` permitido, slugs únicos por categoría y
-> presencia de `_index.md`) está cubierta por la suite de pruebas (`tests/rulesContent.test.ts`).
+> carpeta, slug con formato `[a-z0-9-]`, `status` permitido, slugs únicos por categoría,
+> tags dentro del vocabulario cerrado y presencia de `_index.md`) está cubierta por la
+> suite (`tests/rulesContent.test.ts`). La de los schemas —cada `template:` con archivo,
+> cada `requires:` resolviendo a un `id` existente— por `tests/schemasContent.test.ts`, y
+> la de los enlaces entre reglas por `tests/wikilinks.test.ts`.
 
 ---
 
@@ -140,6 +166,8 @@ Variables de entorno:
 - `AZURE_AD_TENANT_ID` — Tenant ID del tenant de EAFIT (para OAuth)
 - `AZURE_DEVOPS_ORG` — `eafit-dinfo`
 - `AZURE_DEVOPS_PROJECT` — Proyecto por defecto
+- `IAFIT_AUTH_HOST` — Interfaz del callback OAuth (default `127.0.0.1`; en Docker se
+  requiere `0.0.0.0` para que el reenvío de puertos lo alcance)
 
 #### Flujo OAuth al invocar una tool del Grupo B (cuando no hay PAT)
 
@@ -155,7 +183,8 @@ Variables de entorno:
 
 3. Login interactivo:
    ├─ Genera PKCE (code_verifier + code_challenge SHA-256)
-   ├─ Intenta puertos 3456, 3457, 3458 para el callback HTTP (bind: 0.0.0.0)
+   ├─ Intenta puertos 3456, 3457, 3458 para el callback HTTP
+   │   (bind: 127.0.0.1 por defecto; 0.0.0.0 solo si IAFIT_AUTH_HOST lo pide)
    │   └─ Ninguno disponible → error auth_port_unavailable
    ├─ Imprime la URL de autorización completa en stderr con un mensaje claro
    │   (el usuario la copia y la abre manualmente en su navegador)
@@ -203,7 +232,7 @@ Claude Code lanza el contenedor directamente como proceso stdio. Configuración 
       "args": [
         "run", "-i", "--rm",
         "--hostname", "iafit",
-        "-p", "3456:3456",
+        "-p", "3456-3458:3456-3458",
         "-v", "iafit-tokens:/root/.iafit",
         "--env-file", "/ruta/absoluta/a/.env",
         "iafit-mcp:latest"
@@ -216,8 +245,12 @@ Claude Code lanza el contenedor directamente como proceso stdio. Configuración 
 - `-i` es obligatorio: mantiene stdin abierto para que el protocolo MCP por stdio fluya correctamente.
 - `--rm` limpia el contenedor al cerrar, pero el volumen nombrado persiste los tokens.
 - `--hostname iafit` fija el hostname para que la clave de cifrado de tokens sea estable entre reinicios.
-- `-p 3456:3456` mapea el puerto de callback OAuth del host al contenedor.
-- El servidor de callback escucha en `0.0.0.0` dentro del contenedor para recibir el tráfico mapeado desde el host.
+- `-p 3456-3458:3456-3458` mapea el rango de callback OAuth: si 3456 está ocupado, el
+  servidor cae a 3457/3458, así que mapear solo 3456 deja el flujo colgado en ese caso.
+- El callback escucha en **loopback (`127.0.0.1`) por defecto** para no exponerse a la red
+  durante la ventana de auth. **Dentro de Docker eso no basta**: el reenvío de puertos no
+  alcanza el loopback del contenedor, así que hay que pasar `IAFIT_AUTH_HOST=0.0.0.0`
+  (en el `.env` o el `env` del MCP). Con PAT no aplica: no hay callback.
 
 La imagen se construye una sola vez y se reconstruye cada vez que cambia el código fuente:
 
@@ -238,24 +271,37 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 
 ### list_rule_categories
 - **Parámetros:** ninguno
-- **Retorna:** `{ categories: [{ name, description, count }] }`
+- **Retorna:** `{ categories: [{ name, description, count, inactive? }] }`
 - **Confirmación:** no
+- **Nota:** `count` es lo que devuelve `list_rules` por defecto (solo activas), para que
+  ambas tools no se contradigan; `inactive` solo aparece si hay reglas archivadas.
 
 ### list_rules
-- **Parámetros:** `{ category: "architecture"|"code-standards"|"adrs"|"security"|"migration"|"observabilidad"|"pruebas"|"cicd" }`
-- **Retorna:** `{ rules: [{ slug, title, applies_to, status, last_updated }] }`
+- **Parámetros:** `{ category: "architecture"|"code-standards"|"adrs"|"security"|"migration"|"observabilidad"|"pruebas"|"cicd"|"sdd", include_inactive?: boolean }`
+- **Retorna:** `{ rules: [{ slug, title, applies_to, status, last_updated, superseded_by? }] }`
 - **Confirmación:** no
 
 ### get_rule
 - **Parámetros:** `{ category: string, slug: string }`
-- **Retorna:** `{ frontmatter: {...}, content: string }`
+- **Retorna:** `{ frontmatter: {...}, content: string }`; si la regla está obsoleta,
+  además `{ warning: "deprecated"|"superseded", message: string }` redirigiendo a la vigente
 - **Confirmación:** no
 
 ### search_rules
-- **Parámetros:** `{ query: string, category?: string }`
-- **Retorna:** `{ matches: [{ category, slug, title, excerpt }], total: number }`
+- **Parámetros:** `{ query: string, category?: string, limit?: number, include_inactive?: boolean }`
+- **Retorna:** `{ matches: [{ category, slug, title, excerpt, score, applies_to, status }] }`
 - **Confirmación:** no
-- **Nota:** la búsqueda es insensible a mayúsculas y a acentos; el excerpt conserva el texto original.
+- **Nota:** búsqueda por **tokens con ranking** (título > `applies_to` > cuerpo, ponderada
+  por cobertura de términos), insensible a mayúsculas y acentos; el excerpt conserva el
+  texto original. `limit` default 10.
+
+### get_applicable_rules
+- **Parámetros:** `{ tags: string[], mode?: "summary"|"full" }`
+- **Retorna:** `{ rules: [{ category, slug, title, applies_to, status, excerpt? , content? }] }`
+- **Confirmación:** no
+- **Nota:** los tags se validan contra `VALID_TAGS` (error `invalid_tags`). No se pasa
+  `"all"`: las transversales entran solas. `summary` (default) trae un excerpt de una línea;
+  `full` el contenido completo. Ordena las reglas específicas antes que las transversales.
 
 ### list_schemas
 - **Parámetros:** ninguno
@@ -274,13 +320,16 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 
 ### query_work_items
 - **Parámetros:** `{ wiql: string, project?: string, maxResults?: number }`
-- **Retorna:** `{ items: [{ id, title, type, state }], totalCount }`
+- **Retorna:** `{ items: [{ id, title, type, state }], totalCount, truncated }`
 - **Confirmación:** no
+- **Nota:** `maxResults` default 50; el batch de ids se trocea en lotes de 200 (límite de la
+  API). `truncated: true` si el WIQL casó más de lo devuelto.
 
 ### list_pull_requests
-- **Parámetros:** `{ repository: string, status?: "active"|"completed"|"abandoned"|"all", createdBy?: string, project?: string }`
-- **Retorna:** `{ pullRequests: [{ id, title, status, createdBy, sourceBranch, targetBranch, url }] }`
+- **Parámetros:** `{ repository: string, status?: "active"|"completed"|"abandoned"|"all", createdBy?: string, maxResults?: number, project?: string }`
+- **Retorna:** `{ pullRequests: [{ id, title, status, createdBy, sourceBranch, targetBranch, url }], count, truncated }`
 - **Confirmación:** no
+- **Nota:** pagina con `$top`/`$skip` hasta reunir `maxResults` (default 100).
 
 ### get_pr_threads
 - **Parámetros:** `{ repository: string, pullRequestId: number, project?: string }`
@@ -288,16 +337,22 @@ Cambiar `StdioServerTransport` por `StreamableHTTPServerTransport`. Añadir aute
 - **Confirmación:** no
 
 ### create_work_item
-- **Parámetros:** `{ type: string, title: string, description?: string, assignedTo?: string, tags?: string[], project?: string, confirmed: boolean }`
+- **Parámetros:** `{ type: string, title: string, description?: string, assignedTo?: string, tags?: string[], fields?: Record<string, unknown>, parent?: number, project?: string, confirmed: boolean }`
 - **Retorna (false):** `{ requires_confirmation: true, preview: {...}, message: string }`
-- **Retorna (true):** `{ id, title, state, url }`
+- **Retorna (true):** `{ id, title, state, parent?, url }`
 - **Confirmación:** sí
+- **Nota:** `fields` acepta **campos personalizados** por su *reference name* (p. ej.
+  `Custom.TaskType`); los parámetros de conveniencia mapean a campos `System.*`. `parent`
+  no es un campo sino una **relación** (`System.LinkTypes.Hierarchy-Reverse`).
 
 ### update_work_item
-- **Parámetros:** `{ id: number, fields: Record<string, unknown>, project?: string, confirmed: boolean }`
-- **Retorna (false):** `{ requires_confirmation: true, preview: { id, currentFields, changes }, message: string }`
-- **Retorna (true):** `{ id, url, updatedFields }`
+- **Parámetros:** `{ id: number, fields?: Record<string, unknown>, parent?: number, project?: string, confirmed: boolean }`
+- **Retorna (false):** `{ requires_confirmation: true, preview: { id, currentFields, changes, currentParent? }, message: string }`
+- **Retorna (true):** `{ id, url, parent? }`
 - **Confirmación:** sí
+- **Nota:** acepta `fields`, `parent` o ambos. Reasignar el padre remueve primero el vínculo
+  previo (Azure DevOps solo admite uno); si el padre pedido ya es el actual responde
+  `unchanged`. Sin `fields` ni `parent` responde `nothing_to_update`.
 
 ### add_pr_comment
 - **Parámetros:** `{ repository: string, pullRequestId: number, comment: string, threadId?: number, project?: string, confirmed: boolean }`
@@ -325,7 +380,10 @@ El servidor nunca lanza una excepción no capturada. Toda condición de error se
 | Otro error HTTP de la API | `api_error` | Azure DevOps respondió {status}: {cuerpo}. |
 | Regla local no encontrada | `rule_not_found` | No existe regla con slug '{slug}' en categoría '{category}'. |
 | Schema no encontrado / nombre inválido | `schema_not_found` | No existe schema '{name}'. Usa list_schemas para ver los disponibles. |
-| Categoría inválida | `invalid_category` | Categorías válidas: architecture, code-standards, adrs, security, migration, observabilidad, pruebas, cicd. |
+| Categoría inválida | `invalid_category` | Categorías válidas: architecture, code-standards, adrs, security, migration, observabilidad, pruebas, cicd, sdd. |
+| `tags` vacío o fuera de `VALID_TAGS` | `invalid_tags` | Debes indicar al menos un tag. Tags válidos: {lista}. |
+| `mode` distinto de summary/full | `invalid_mode` | (modos válidos) |
+| `update_work_item` sin `fields` ni `parent` | `nothing_to_update` | No hay nada que actualizar. |
 | Tool inexistente | `unknown_tool` | Tool '{name}' no existe. |
 | Excepción no controlada en un handler | `internal_error` | (mensaje del error) |
 
@@ -397,13 +455,23 @@ Cobertura por área:
 
 | Archivo | Qué protege |
 |---------|-------------|
-| `rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda insensible a acentos/mayúsculas |
+| `rulesReader.test.ts` | Categorías, listado con frontmatter, `getRule`, búsqueda por tokens con ranking (acentos/mayúsculas, cobertura, `limit`) |
+| `getApplicableRules.test.ts` | Matching por tags, `all` que entra solo, modos `summary`/`full`, orden específicas antes que transversales |
+| `ruleStatus.test.ts` | Ciclo de vida: obsoletas omitidas salvo `include_inactive`, aviso con `superseded_by`, reglas archivadas en subcarpeta legibles, `list_rule_categories` coherente con `list_rules` |
+| `rulesContent.test.ts` | Integridad de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`, tags del vocabulario cerrado, reglas `sdd` no marcadas `all`) |
+| `wikilinks.test.ts` | Todo `[[slug]]` / `[[categoria:slug]]` del corpus resuelve y no es ambiguo |
 | `schemasReader.test.ts` | Listado, descripción plegada, obtención con plantillas, rechazo de path traversal |
+| `schemasContent.test.ts` | Integridad de `schemas/`: `template:` con archivo, `requires:` resolviendo a un `id` anterior, `apply` válido, sin plantillas huérfanas |
+| `prompts.test.ts` | Catálogo de prompts y contratos de contenido (`iafit-desarrollo` carga reglas antes de codificar; `iafit-sdd` consulta el catálogo en vez de enumerarlo) |
 | `tokenStore.test.ts` | Roundtrip de cifrado, ausencia de secretos en claro, detección de manipulación, `clearTokens` |
+| `oauthFlow.test.ts` | Single-flight del refresh, fast path del token vigente, liberación del lock tras fallo |
 | `azureDevOpsClient.test.ts` | Basic auth con PAT, construcción de URL, mapeo de errores HTTP, error de red |
 | `confirmacion.test.ts` | Contrato de confirmación: `confirmed:false` nunca escribe; `confirmed:true` ejecuta |
-| `toolDefinitions.test.ts` | Catálogo de tools: nombres únicos, schemas bien formados, `confirmed` obligatorio en escrituras |
-| `rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
+| `createWorkItemFields.test.ts` · `typeFieldsCache.test.ts` | Campos personalizados en el patch document y caché de campos por tipo |
+| `workItemParent.test.ts` | Vínculo padre: relación emitida en `create`/`update`; reasignar remueve el previo |
+| `pagination.test.ts` | `list_pull_requests` (`$top`/`$skip`, `truncated`) y troceo del batch de ids en `query_work_items` |
+| `toolDefinitions.test.ts` | Catálogo de tools: nombres únicos, `inputSchema` como raw shape de zod, `confirmed` obligatorio en escrituras |
+| `usageLog.test.ts` | Telemetría: una línea por llamada, `IAFIT_TELEMETRY=0`, rotación, sin payloads sensibles |
 
 Los módulos leen `process.env` en el momento de importarse; por eso los tests fijan las
 variables de entorno (`IAFIT_RULES_DIR`, `IAFIT_SCHEMAS_DIR`, `IAFIT_DATA_DIR`, credenciales
@@ -412,4 +480,7 @@ archivo en su propio proceso (`pool: 'forks'`, `isolate: true`).
 
 ---
 
-*Versión del diseño: 0.5 — MVP local con suite de pruebas; se agregan tools de schemas, prompts, y las 8 categorías de reglas.*
+*Versión del diseño: 0.6 (2026-07-30) — se agregan `get_applicable_rules`, el ciclo de vida
+de reglas (`superseded` + archivado en subcarpeta), la categoría `sdd` con la constitución
+institucional heredable por SpecKit, el schema `cambio-de-framework-sdd` y el prompt
+`iafit-sdd`. Total: 9 categorías de reglas, 4 schemas y 4 prompts.*
