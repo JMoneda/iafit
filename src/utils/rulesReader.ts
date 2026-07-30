@@ -68,7 +68,8 @@ export type Tag =
   | 'dotnet'
   | 'angular'
   | 'typescript'
-  | 'libreria';
+  | 'libreria'
+  | 'sdd';
 
 export const VALID_TAGS: Tag[] = [
   'all',
@@ -79,6 +80,7 @@ export const VALID_TAGS: Tag[] = [
   'angular',
   'typescript',
   'libreria',
+  'sdd',
 ];
 
 export const TAG_DESCRIPTIONS: Record<Tag, string> = {
@@ -90,6 +92,7 @@ export const TAG_DESCRIPTIONS: Record<Tag, string> = {
   angular: 'Stack Angular',
   typescript: 'Código TypeScript (front o back)',
   libreria: 'Librería publicada (feed privado / npm)',
+  sdd: 'El proyecto trabaja con especificaciones (OpenSpec / SpecKit). Es un tag de CONTEXTO, no de stack: SDD es opt-in, hoy se usa sobre todo en migraciones, y un proyecto que no especifica no debe recibir estas reglas',
 };
 
 export function isValidTag(tag: string): tag is Tag {

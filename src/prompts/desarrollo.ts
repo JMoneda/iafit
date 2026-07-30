@@ -17,7 +17,9 @@ Antes de preguntar, inspecciona el repo para proponer el contexto:
 - Backend .NET: *.csproj, global.json, Program.cs/Startup.cs.
 - Librería publicada: projects/<lib>/package.json con ng-packagr / public-api.ts.
 Menciona lo detectado y traduce a tags de applies_to (frontend, angular, typescript,
-backend, dotnet, data, libreria).
+backend, dotnet, data, libreria). Añade el tag "sdd" SOLO si el proyecto ya trabaja con
+especificaciones (existe openspec/ o .specify/): es un tag de contexto, no de stack, y SDD
+es opt-in. Si el proyecto no especifica, no lo incluyas: sus reglas no le aplican.
 
 ## Paso 1 — Confirmar qué se va a construir (una pregunta)
 Pregunta, en una sola interacción, qué va a construir el usuario y sobre qué stack, y

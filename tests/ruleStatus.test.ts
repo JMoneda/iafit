@@ -62,6 +62,31 @@ describe('filtrado por estado — searchRules', () => {
   });
 });
 
+describe('list_rule_categories — el conteo no contradice a list_rules', () => {
+  /**
+   * Antes, `count` incluía las inactivas mientras list_rules las excluía por defecto:
+   * el agente leía "adrs: 2", pedía la lista, recibía 1, y no podía distinguir un
+   * filtro de un fallo del servidor. `count` debe ser lo que list_rules devuelve.
+   */
+  it('count coincide con list_rules e inactive expone las archivadas', async () => {
+    vi.resetModules();
+    process.env.IAFIT_RULES_DIR = FIXTURES;
+    const { handler } = await import('../src/tools/rules/listRuleCategories.js');
+    const m = await import('../src/utils/rulesReader.js');
+
+    const categorias = (handler({}) as { categories: Array<Record<string, number | string>> })
+      .categories;
+    for (const c of categorias) {
+      const esperado = m.listRulesInCategory(c.name as never).length;
+      expect(c.count, `count de '${c.name}' debe coincidir con list_rules`).toBe(esperado);
+    }
+
+    const adrs = categorias.find(c => c.name === 'adrs')!;
+    expect(adrs.count).toBe(1); // 0002-sql
+    expect(adrs.inactive).toBe(1); // 0001-postgres, archivado pero trazable
+  });
+});
+
 describe('getRule — aviso de regla obsoleta', () => {
   it('regla superseded devuelve warning + mensaje que apunta al reemplazo', async () => {
     const m = await loadReader();

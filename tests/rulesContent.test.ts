@@ -117,6 +117,22 @@ describe('integridad del contenido de rules/', () => {
     expect(duplicados, `\n${duplicados.join('\n')}`).toEqual([]);
   });
 
+  it('las reglas de sdd NO usan el tag "all": SDD es opt-in', () => {
+    // Si una regla de sdd se marcara 'all', get_applicable_rules se la impondría a
+    // TODO proyecto, incluidos los que no trabajan con especificaciones. El tag de
+    // contexto 'sdd' existe justamente para que haya que pedirlas explícitamente.
+    const conAll: string[] = [];
+    for (const archivo of reglasDe('sdd')) {
+      const { data } = matter(fs.readFileSync(path.join(RULES_DIR, 'sdd', archivo), 'utf8'));
+      const tags = Array.isArray(data.applies_to) ? data.applies_to : [];
+      if (tags.includes('all')) conAll.push(archivo);
+    }
+    expect(
+      conAll,
+      `\nEstas reglas de sdd se impondrían a todos los proyectos: ${conAll.join(', ')}`,
+    ).toEqual([]);
+  });
+
   it('todo applies_to usa solo tags del vocabulario cerrado (VALID_TAGS)', () => {
     const invalidos: string[] = [];
 

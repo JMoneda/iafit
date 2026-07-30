@@ -4,19 +4,29 @@ category: sdd
 slug: constitucion-institucional
 version: "1.0"
 last_updated: "2026-07-30"
-applies_to: ["all"]
+applies_to: ["sdd"]
 status: active
 ---
 
 ## Regla
 
-**Todo proyecto EAFIT que use SpecKit DEBE instalar esta constitución antes de su primera
+**Aplica solo a proyectos que hayan adoptado SpecKit.** No obliga a nadie a adoptar SDD ni
+a cambiar de framework: si un proyecto no especifica, esta regla no le pide nada
+(ver [[eleccion-de-framework]]).
+
+Para un proyecto que sí usa SpecKit: **instala esta constitución antes de su primera
 feature.** El bloque de abajo es un `constitution.md` completo y válido: se copia tal cual
 a `.specify/memory/constitution.md`, sin reescribirlo ni resumirlo. Los proyectos pueden
 **añadir** principios propios; **no pueden debilitar ni eliminar** los que vienen aquí.
 
 Los proyectos OpenSpec no necesitan instalarla: sus principios ya los aplica el MCP a
 través de las reglas de las que esta constitución deriva.
+
+> **Alcance actual (2026-07-30):** en EAFIT, SDD se usa sobre todo en **migraciones y
+> actualizaciones**, y ahí el framework habitual es OpenSpec. Esta constitución existe para
+> el caso en que un proyecto elija SpecKit, no como norma general de toda la organización.
+> Las políticas que sí son universales (seguridad, README, pruebas) viven en sus propias
+> categorías y se aplican con o sin SDD.
 
 ## Justificación
 

@@ -4,7 +4,7 @@ category: sdd
 slug: invariantes-sdd
 version: "1.0"
 last_updated: "2026-07-30"
-applies_to: ["all"]
+applies_to: ["sdd"]
 status: active
 ---
 

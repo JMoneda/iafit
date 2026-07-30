@@ -4,8 +4,10 @@ Servidor MCP de EAFIT que centraliza, como tools para agentes de IA (Claude Code
 Copilot y cualquier cliente MCP):
 
 - **Reglas de ingeniería** de la empresa (arquitectura, estándares de código, seguridad,
-  observabilidad, pruebas, CI/CD, ADRs y migración).
-- **Schemas de OpenSpec** para el flujo de migración/actualización de proyectos.
+  observabilidad, pruebas, CI/CD, ADRs, migración y SDD).
+- **Schemas de OpenSpec** para el flujo de migración/actualización de proyectos, y para
+  convertir un proyecto entre **OpenSpec y SpecKit**.
+- **Constitución institucional** heredable por los proyectos que usan SpecKit.
 - **Acceso a Azure DevOps** (work items y pull requests).
 
 Toda la documentación y los artefactos que produce el flujo se generan en **español**.
@@ -16,12 +18,12 @@ Toda la documentación y los artefactos que produce el flujo se generan en **esp
 
 | Tool | Qué hace |
 |------|----------|
-| `list_rule_categories` | Lista las categorías de reglas y cuántas hay en cada una |
+| `list_rule_categories` | Lista las categorías de reglas y cuántas hay en cada una (`count` = lo que devuelve `list_rules`, o sea solo activas; `inactive` cuenta las archivadas) |
 | `list_rules` | Lista las reglas de una categoría (omite obsoletas salvo `include_inactive`) |
 | `get_rule` | Devuelve el contenido completo de una regla (avisa si está obsoleta y a qué fue reemplazada) |
 | `search_rules` | Búsqueda por tokens con ranking en todas las reglas (relevancia, `limit`, `include_inactive`) |
 | `get_applicable_rules` | Devuelve, en una sola llamada, todas las reglas activas que aplican a un stack o contexto (por tags de `applies_to`); atajo para arrancar una tarea de desarrollo |
-| `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT |
+| `list_schemas` | Lista los schemas de OpenSpec que provee IAFIT (migración y conversión entre frameworks SDD) |
 | `get_schema` | Devuelve un schema (schema.yaml + plantillas) para instalarlo en un proyecto |
 | `get_work_item` | Azure DevOps: lee un work item por ID |
 | `query_work_items` | Azure DevOps: ejecuta WIQL; pagina el batch (`maxResults`, `truncated`) |
@@ -212,13 +214,18 @@ tools se derivan de `VALID_CATEGORIES`).
 
 ### SDD: OpenSpec y SpecKit
 
-Los proyectos EAFIT trabajan con desarrollo guiado por especificación, y conviven dos
-frameworks. La categoría `sdd` fija lo que **no** depende de cuál se use:
+**SDD es opt-in.** Estas reglas llevan el tag de contexto `sdd`, no `all`: un proyecto que
+no trabaja con especificaciones **no las recibe**, y uno que ya tiene su framework
+declarado se queda con el que tiene. Hoy, en EAFIT, SDD y los schemas de IAFIT se usan
+sobre todo en **migraciones y actualizaciones**; fuera de ahí la adopción es caso a caso.
+
+Para los proyectos que sí especifican, conviven dos frameworks y la categoría `sdd` fija lo
+que **no** depende de cuál se use:
 
 | Regla | Para qué |
 |-------|----------|
 | `invariantes-sdd` | Los cinco invariantes que cumplen ambos frameworks (spec antes que código, requisitos verificables, spec como línea base viva, español, reglas por encima de la spec) |
-| `eleccion-de-framework` | Cuándo OpenSpec y cuándo SpecKit. **OpenSpec es el default institucional**; SpecKit es válido pero se justifica por escrito. Prohibido tener ambos en el mismo repo |
+| `eleccion-de-framework` | Cuándo OpenSpec y cuándo SpecKit. Si arrancas de cero y no tienes preferencia, **OpenSpec** es el de menos fricción (los schemas ya están en su formato); SpecKit es válido y solo pide justificarse. Prohibido tener ambos en el mismo repo |
 | `equivalencias-openspec-speckit` | Mapeo artefacto por artefacto y, sobre todo, **qué se pierde al convertir** en cada sentido |
 | `constitucion-institucional` | Un `constitution.md` completo, listo para copiar a `.specify/memory/constitution.md` |
 
@@ -251,6 +258,7 @@ matching por intersección fallaría en silencio. Por eso el test de integridad
 | Tag | Significado |
 |-----|-------------|
 | `all` | Regla transversal: aplica a cualquier stack o contexto (seguridad, observabilidad, CI/CD). Se incluye sola; no se pide como tag de búsqueda |
+| `sdd` | **Tag de contexto, no de stack.** El proyecto trabaja con especificaciones (OpenSpec/SpecKit). SDD es opt-in: estas reglas solo salen si se pide el tag explícitamente, para no imponérselas a proyectos que no especifican |
 | `backend` | Servicios backend (independiente del lenguaje) |
 | `frontend` | Aplicaciones y librerías de front-end |
 | `data` | Persistencia y modelado de datos |
@@ -308,6 +316,10 @@ openspec init --tools claude,github-copilot   # genera los comandos opsx:*
 Regla de oro: **un salto de versión = un change = una rama**
 `migration/<componente>-<framework>-<versión>`. El MCP entrega reglas y contenido; el
 agente ejecuta git/npm/dotnet y escribe los archivos.
+
+> Este flujo asume OpenSpec, que es donde se usa hoy. Si el proyecto ya está en SpecKit, o
+> no sabes en cuál está, invoca el prompt `iafit-sdd`: detecta el framework y ofrece las
+> opciones sin asumir nada (ver [SDD: OpenSpec y SpecKit](#sdd-openspec-y-speckit)).
 
 ## Autenticación de Azure DevOps
 
@@ -492,8 +504,10 @@ Cobertura por área:
 | `tests/workItemParent.test.ts` | Vínculo padre: `create`/`update` emiten la relación; reasignar remueve el padre previo antes de agregar el nuevo |
 | `tests/pagination.test.ts` | Paginación: `list_pull_requests` (`$top`/`$skip`, `truncated`) y troceo del batch de ids en `query_work_items` |
 | `tests/oauthFlow.test.ts` | OAuth: single-flight (un refresh por ráfaga concurrente), fast path del token vigente, liberación del lock tras fallo |
-| `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`) |
-| `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by` |
+| `tests/rulesContent.test.ts` | Integridad del contenido real de `rules/` (frontmatter, categorías, slugs únicos, `_index.md`, y que las reglas `sdd` no se marquen `all`) |
+| `tests/schemasContent.test.ts` | Integridad del contenido real de `schemas/`: cada `template:` tiene archivo, cada `requires:` resuelve a un `id` existente y anterior, `apply` válido, sin plantillas huérfanas |
+| `tests/ruleStatus.test.ts` | Ciclo de vida: `list_rules`/`search_rules` omiten obsoletas salvo `include_inactive`; `get_rule` avisa y redirige vía `superseded_by`; reglas archivadas en subcarpeta siguen siendo legibles; `list_rule_categories` no contradice a `list_rules` |
+| `tests/prompts.test.ts` | Catálogo de prompts (nombres únicos, `build()` bien formado) y contratos de contenido: `iafit-desarrollo` carga reglas antes de codificar, `iafit-sdd` consulta el catálogo en vez de enumerarlo y no actúa sin confirmación |
 | `tests/usageLog.test.ts` | Telemetría: una línea por llamada, desactivación con `IAFIT_TELEMETRY=0`, fire-and-forget, rotación y `extractMeta` (búsquedas con 0 resultados, sin payloads sensibles) |
 | `tests/wikilinks.test.ts` | Integridad de wikilinks: todo `[[slug]]`/`[[categoria:slug]]` del corpus resuelve a una regla existente y no ambigua |
 

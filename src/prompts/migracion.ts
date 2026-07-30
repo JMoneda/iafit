@@ -41,6 +41,8 @@ Con las respuestas:
   # Guía de migración (IAFIT)
   Este proyecto está en migración incremental gestionada con IAFIT + OpenSpec.
   - Al iniciar, pide a IAFIT las reglas de migración: list_rules(category="migration").
+  - Como este proyecto trabaja con especificaciones, incluye el tag de contexto "sdd" al
+    pedir reglas aplicables: get_applicable_rules(tags=[<stack>, "sdd"]).
   - Framework/objetivo: <framework> <actual> → <objetivo>.
   - Un salto por rama: migration/<componente>-<framework>-<versión>.
   - TODO se documenta en español.

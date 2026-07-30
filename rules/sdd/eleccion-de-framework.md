@@ -4,27 +4,46 @@ category: sdd
 slug: eleccion-de-framework
 version: "1.0"
 last_updated: "2026-07-30"
-applies_to: ["all"]
+applies_to: ["sdd"]
 status: active
 ---
 
 ## Regla
 
-**Un proyecto usa UN framework SDD a la vez, y la elección se registra por escrito.**
-Tener `openspec/` y `.specify/` conviviendo en el mismo repositorio **no está permitido**:
-produce dos fuentes de verdad que divergen en silencio. Si se detectan ambos, se resuelve
-antes de continuar cualquier trabajo de especificación.
+**SDD es opt-in: esta regla solo aplica a proyectos que decidieron trabajar con
+especificaciones.** No obliga a adoptarlo. Un proyecto sin SDD no incumple nada, y un
+proyecto que ya declaró su framework **se queda con el que tiene**: esta regla no es una
+orden de migrar.
 
-Por defecto institucional, **OpenSpec** es el framework de arranque para proyectos nuevos
-de EAFIT. Elegir SpecKit es una decisión válida pero **explícita**: se justifica y se
-registra (en el README del proyecto o en un ADR).
+Para los proyectos que sí hacen SDD:
+
+1. **Se usa UN framework a la vez, y la elección se registra por escrito.** Tener
+   `openspec/` y `.specify/` conviviendo en el mismo repositorio **no está permitido**:
+   produce dos fuentes de verdad que divergen en silencio.
+2. **Si vas a arrancar SDD desde cero y no tienes preferencia, empieza por OpenSpec.** No
+   es un mandato: es el camino con menos fricción, porque los schemas de IAFIT ya están
+   escritos en su formato. Si el equipo prefiere SpecKit, es una decisión válida que solo
+   pide justificarse por escrito.
+
+## Cuándo NO aplica esta categoría
+
+- Proyectos que no trabajan con especificaciones. **No hay obligación de adoptar SDD.**
+- Cambios que no alteran comportamiento observable: refactor interno, formato,
+  actualización de dependencias sin efecto de contrato. SDD no es un peaje.
+- Proyectos que ya tienen su framework declarado y funcionando: se respeta. Cambiar de
+  framework solo tiene sentido si hay un motivo concreto, y entonces se hace con el flujo
+  de conversión, no por alineación.
+
+**Contexto actual (2026-07-30):** en EAFIT, SDD y los schemas de IAFIT se usan sobre todo
+en **migraciones y actualizaciones** de proyectos existentes. Fuera de ese escenario, la
+adopción es caso a caso.
 
 ## Justificación
 
-El default no es una preferencia estética. OpenSpec trae de fábrica el invariante que más
-cuesta sostener a mano: la **baseline viva** (`openspec archive` fusiona los deltas en
-`openspec/specs/`). En SpecKit ese comportamiento hay que imponerlo por constitución y
-sostenerlo con disciplina humana, porque la herramienta no lo hace sola
+La recomendación de OpenSpec para empezar no es preferencia estética. Trae de fábrica el
+invariante que más cuesta sostener a mano: la **baseline viva** (`openspec archive` fusiona
+los deltas en `openspec/specs/`). En SpecKit ese comportamiento hay que imponerlo por
+constitución y sostenerlo con disciplina humana, porque la herramienta no lo hace sola
 (ver [[equivalencias-openspec-speckit]]).
 
 Además, el corpus de schemas de iafit ya está escrito en el formato de schemas custom de
@@ -52,10 +71,6 @@ OpenSpec (`schema.yaml` + `templates/`), así que en OpenSpec se consume directo
   antes de implementar.
 - El proyecto es una feature acotada y de vida corta, donde la baseline aporta poco.
 
-**Ninguno de los dos** si el cambio no altera comportamiento observable (refactor puro,
-formato, actualización de dependencias sin efecto de contrato). SDD no es un peaje: es
-para cambios que valen una spec.
-
 ## Obligaciones al elegir SpecKit
 
 Elegir SpecKit **obliga** a compensar lo que la herramienta no da:
@@ -67,6 +82,8 @@ Elegir SpecKit **obliga** a compensar lo que la herramienta no da:
    saber qué hace el sistema sin leer todas las features.
 
 ## Verificación
+
+Solo aplica si el proyecto hace SDD. Si no lo hace, no hay nada que verificar aquí.
 
 1. El README del proyecto declara qué framework usa y, si es SpecKit, por qué.
 2. No coexisten las dos raíces:

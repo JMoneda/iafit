@@ -33,8 +33,9 @@ Di al usuario qué detectaste y en qué te basaste (rutas concretas). No pregunt
 
 ## Paso 1 — Cargar el marco y el catálogo REAL (obligatorio, antes de ofrecer nada)
 
-1. \`get_applicable_rules(tags=["all"], mode="summary")\` o \`list_rules(category="sdd")\`
-   para traer las reglas de SDD vigentes.
+1. \`get_applicable_rules(tags=["sdd"], mode="summary")\` o \`list_rules(category="sdd")\`
+   para traer las reglas de SDD vigentes. El tag \`sdd\` es de CONTEXTO, no de stack: estas
+   reglas NO salen en consultas normales porque SDD es opt-in, y hay que pedirlo explícito.
 2. \`get_rule(category="sdd", slug="eleccion-de-framework")\` — rige la recomendación que
    vas a dar.
 3. \`list_schemas()\` — el catálogo de flujos de trabajo disponibles.
