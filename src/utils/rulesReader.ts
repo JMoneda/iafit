@@ -121,15 +121,43 @@ export interface RuleEntry {
 
 export type RuleError = { error: string; message: string };
 
-function listMarkdownFiles(category: Category): string[] {
-  const dir = path.join(RULES_DIR, category);
+function walkMarkdown(dir: string, prefix: string): string[] {
+  let entries: fs.Dirent[];
   try {
-    return fs
-      .readdirSync(dir)
-      .filter(f => f.endsWith('.md') && f !== '_index.md');
+    entries = fs.readdirSync(dir, { withFileTypes: true });
   } catch {
     return [];
   }
+  const out: string[] = [];
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      out.push(...walkMarkdown(path.join(dir, e.name), `${prefix}${e.name}/`));
+    } else if (e.name.endsWith('.md') && e.name !== '_index.md') {
+      out.push(`${prefix}${e.name}`);
+    }
+  }
+  return out;
+}
+
+/**
+ * Lista los .md de una categoría RECURSIVAMENTE. Las subcarpetas son organización
+ * del corpus, no categorías: `adrs/superseded/` archiva los ADRs reemplazados sin
+ * sacarlos del índice (siguen siendo consultables por trazabilidad y sus wikilinks
+ * siguen resolviendo). Devuelve rutas relativas a la carpeta de la categoría
+ * (`superseded/0001-use-postgres.md`), así que `path.join(RULES_DIR, cat, file)`
+ * sigue funcionando en todos los callers. Los `_index.md` se excluyen a cualquier
+ * profundidad; el slug NO lleva la subcarpeta (ver slugFromFile).
+ */
+function listMarkdownFiles(category: Category): string[] {
+  return walkMarkdown(path.join(RULES_DIR, category), '');
+}
+
+/**
+ * Slug por defecto cuando el frontmatter no lo declara. Usa el nombre de archivo
+ * sin ruta ni extensión: mover una regla a una subcarpeta no cambia su slug.
+ */
+function slugFromFile(file: string): string {
+  return path.basename(file, '.md');
 }
 
 function readFrontmatter(filePath: string): Partial<RuleFrontmatter> {
@@ -158,7 +186,7 @@ export function listRulesInCategory(
     .map(file => {
       const fm = readFrontmatter(path.join(RULES_DIR, category, file));
       return {
-        slug: fm.slug ?? file.replace('.md', ''),
+        slug: fm.slug ?? slugFromFile(file),
         title: fm.title ?? file,
         applies_to: fm.applies_to ?? ['all'],
         status: fm.status ?? 'active',
@@ -180,7 +208,7 @@ export function getRule(
 
   const file = files.find(f => {
     const fm = readFrontmatter(path.join(dir, f));
-    return fm.slug === slug || f === `${slug}.md`;
+    return fm.slug === slug || path.basename(f) === `${slug}.md`;
   });
 
   if (!file) {
@@ -330,7 +358,7 @@ export function searchRules(query: string, options: SearchOptions = {}): SearchM
 
         results.push({
           category: cat,
-          slug: fm.slug ?? file.replace('.md', ''),
+          slug: fm.slug ?? slugFromFile(file),
           title,
           excerpt,
           score: Math.round(score * 100) / 100,
@@ -416,7 +444,7 @@ export function getApplicableRules(
 
         const base: ApplicableRule = {
           category: cat,
-          slug: fm.slug ?? file.replace('.md', ''),
+          slug: fm.slug ?? slugFromFile(file),
           title: fm.title ?? file,
           applies_to: ruleTags,
           status,

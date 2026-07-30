@@ -164,7 +164,9 @@ node dist/index.js
 
 ## Reglas
 
-Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). Categorías actuales:
+Viven en `rules/<categoría>/<slug>.md` (Markdown con frontmatter). El lector recorre cada
+categoría **recursivamente**: las subcarpetas son organización del corpus, no categorías
+nuevas, y no afectan al `slug` (ver *Archivar una regla reemplazada*). Categorías actuales:
 
 | Categoría | Contenido |
 |-----------|-----------|
@@ -193,6 +195,15 @@ todos los términos rankea por encima de casar solo uno), insensible a acentos y
 `[[categoria:slug]]` cuando el mismo slug exista en más de una categoría. El test
 `tests/wikilinks.test.ts` **rechaza enlaces rotos o ambiguos**, así que renombrar o mover
 una regla obliga a actualizar quienes la enlazan (el build lo detecta).
+
+**Archivar una regla reemplazada:** el nombre de una regla describe la decisión que registró,
+no el estado actual del stack — `adrs/0001-use-postgres` no significa que hoy se use
+PostgreSQL. Para que no confunda al ver el árbol de archivos, las reglas obsoletas se mueven
+a una subcarpeta `superseded/` dentro de su categoría (`rules/adrs/superseded/`). **El nombre
+del archivo y el `slug` no cambian**: mover una regla no la saca del corpus. El lector
+recorre las categorías recursivamente, así que la regla archivada sigue siendo consultable
+con `get_rule` y con `list_rules`/`search_rules` + `include_inactive: true`, y sus
+`[[wikilinks]]` siguen resolviendo. Archivar ≠ borrar: se conservan por trazabilidad.
 
 **Agregar una categoría:** una sola línea en `src/utils/rulesReader.ts` (los enums de las
 tools se derivan de `VALID_CATEGORIES`).

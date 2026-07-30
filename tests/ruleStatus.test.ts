@@ -29,6 +29,23 @@ describe('filtrado por estado — listRulesInCategory', () => {
   });
 });
 
+describe('reglas archivadas en subcarpeta (adrs/superseded/)', () => {
+  // El fixture 0001-postgres vive en adrs/superseded/: archivar un ADR reemplazado
+  // NO puede sacarlo del corpus, o se pierde la trazabilidad y sus wikilinks mueren.
+  it('una regla en subcarpeta sigue siendo legible por su slug, sin prefijo de ruta', async () => {
+    const m = await loadReader();
+    const r = m.getRule('adrs', '0001-postgres');
+    expect('error' in r).toBe(false);
+    const archivada = m.listRulesInCategory('adrs', true).find(x => x.slug === '0001-postgres');
+    expect(archivada, 'la regla archivada debe seguir listándose con include=true').toBeDefined();
+  });
+
+  it('la subcarpeta no crea una regla nueva ni altera el conteo', async () => {
+    const m = await loadReader();
+    expect(m.countRulesInCategory('adrs')).toBe(2); // 0002-sql + el archivado
+  });
+});
+
 describe('filtrado por estado — searchRules', () => {
   it('por defecto no devuelve reglas obsoletas', async () => {
     const m = await loadReader();

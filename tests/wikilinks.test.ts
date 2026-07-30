@@ -24,17 +24,34 @@ interface Violacion {
   motivo: 'inexistente' | 'ambiguo' | 'categoria-invalida';
 }
 
-/** Construye el mapa slug -> categorías donde aparece. */
-function indexarSlugs(rulesDir: string): Map<string, string[]> {
-  const idx = new Map<string, string[]>();
-  const cats = fs
+function categoriasDe(rulesDir: string): string[] {
+  return fs
     .readdirSync(rulesDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name);
-  for (const cat of cats) {
-    for (const archivo of fs.readdirSync(path.join(rulesDir, cat))) {
-      if (!archivo.endsWith('.md') || archivo === '_index.md') continue;
-      let slug = archivo.replace(/\.md$/, '');
+}
+
+/**
+ * Los .md de una categoría, incluyendo subcarpetas (`adrs/superseded/`): una regla
+ * archivada sigue en el índice de slugs, así que los enlaces que la referencian
+ * siguen resolviendo en vez de romperse al moverla.
+ */
+function markdownsDe(rulesDir: string, cat: string, sub = ''): string[] {
+  const out: string[] = [];
+  for (const e of fs.readdirSync(path.join(rulesDir, cat, sub), { withFileTypes: true })) {
+    if (e.isDirectory()) out.push(...markdownsDe(rulesDir, cat, path.join(sub, e.name)));
+    else if (e.name.endsWith('.md')) out.push(path.join(sub, e.name));
+  }
+  return out;
+}
+
+/** Construye el mapa slug -> categorías donde aparece. */
+function indexarSlugs(rulesDir: string): Map<string, string[]> {
+  const idx = new Map<string, string[]>();
+  for (const cat of categoriasDe(rulesDir)) {
+    for (const archivo of markdownsDe(rulesDir, cat)) {
+      if (path.basename(archivo) === '_index.md') continue;
+      let slug = path.basename(archivo, '.md');
       try {
         const { data } = matter(fs.readFileSync(path.join(rulesDir, cat, archivo), 'utf8'));
         if (typeof data.slug === 'string') slug = data.slug;
@@ -54,14 +71,8 @@ function analizarWikilinks(rulesDir: string): Violacion[] {
   const idx = indexarSlugs(rulesDir);
   const violaciones: Violacion[] = [];
 
-  const cats = fs
-    .readdirSync(rulesDir, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name);
-
-  for (const cat of cats) {
-    for (const archivo of fs.readdirSync(path.join(rulesDir, cat))) {
-      if (!archivo.endsWith('.md')) continue;
+  for (const cat of categoriasDe(rulesDir)) {
+    for (const archivo of markdownsDe(rulesDir, cat)) {
       const ref = `${cat}/${archivo}`;
       const raw = fs.readFileSync(path.join(rulesDir, cat, archivo), 'utf8');
       for (const m of raw.matchAll(WIKILINK_RE)) {

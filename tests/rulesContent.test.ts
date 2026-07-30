@@ -24,10 +24,19 @@ function categoriasExistentes(): string[] {
     .sort();
 }
 
-function reglasDe(categoria: string): string[] {
-  return fs
-    .readdirSync(path.join(RULES_DIR, categoria))
-    .filter(f => f.endsWith('.md') && f !== '_index.md');
+/**
+ * Reglas de una categoría, incluyendo subcarpetas (`adrs/superseded/`). Recorre
+ * igual que el reader real: si una regla archivada quedara fuera de este barrido,
+ * escaparía a la validación de frontmatter sin que nadie se entere.
+ */
+function reglasDe(categoria: string, sub = ''): string[] {
+  const dir = path.join(RULES_DIR, categoria, sub);
+  const out: string[] = [];
+  for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) out.push(...reglasDe(categoria, path.join(sub, e.name)));
+    else if (e.name.endsWith('.md') && e.name !== '_index.md') out.push(path.join(sub, e.name));
+  }
+  return out;
 }
 
 describe('integridad del contenido de rules/', () => {
@@ -90,7 +99,7 @@ describe('integridad del contenido de rules/', () => {
       const vistos = new Map<string, string>();
       for (const archivo of reglasDe(categoria)) {
         const ruta = path.join(RULES_DIR, categoria, archivo);
-        let slug = archivo.replace(/\.md$/, '');
+        let slug = path.basename(archivo, '.md');
         try {
           const { data } = matter(fs.readFileSync(ruta, 'utf8'));
           if (typeof data.slug === 'string') slug = data.slug;
