@@ -29,6 +29,10 @@ y el `upgrade-assistant`.
   asignación null-condicional (`x?.P = v`), modificadores en parámetros de lambda.
 - Mejoras de rendimiento en runtime, JIT y GC; mejoras en ASP.NET Core y minimal APIs.
 - **EF Core 10**: revisar breaking changes de proveedor y traducción de consultas.
+- **OpenAPI**: el documento se emite en **3.1** por defecto (antes 3.0) —los nulos pasan de
+  `nullable: true` a `"type": [..., "null"]`—, los comentarios XML se incorporan solos y
+  `Microsoft.OpenApi` 2.x rompe los *transformers*. La UI es **Scalar**, no Swagger UI:
+  ver [[openapi-scalar-dotnet]].
 - Al ser destino final: consolidar cumplimiento de los estándares [[dotnet]],
   [[clean-architecture-dotnet]], observabilidad ([[logging-appinsights]]) y seguridad
   ([[secrets-management]]).

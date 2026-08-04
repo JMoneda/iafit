@@ -130,8 +130,9 @@ apply:
     - Tras verificar paridad, revisa que el API quede bien documentado (regla
       'documentacion-api-cierre'): README del API actualizado y Swagger/OpenAPI
       presente. Si el API NO tiene Swagger, impleméntalo según el stack
-      (Swashbuckle en .NET <=8; Microsoft.AspNetCore.OpenApi en .NET 9/10;
-      extensión OpenAPI de Functions si es Azure Functions).
+      (Swashbuckle en .NET <=8; en .NET 9+ Microsoft.AspNetCore.OpenApi + UI Scalar,
+      retirando Swashbuckle — ver la regla 'openapi-scalar-dotnet'; extensión
+      OpenAPI de Functions si es Azure Functions).
     - Es SOLO documentación (expone el contrato existente, no cambia comportamiento):
       hazlo en su PROPIO commit, verifica que build y paridad siguen verdes, y no
       expongas datos sensibles ni endpoints internos sin protección.

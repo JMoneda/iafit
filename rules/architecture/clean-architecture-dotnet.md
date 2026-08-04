@@ -45,7 +45,9 @@ referencia de EAFIT para los servicios del portal.
 - **SOLID** en todas las capas.
 - La SPA nunca llega directo al backend: siempre a través del **API Gateway**
   (ver [[frontend-spa-angular]] y [[plataforma-azure]]).
-- Documentación de API con **Swagger/OpenAPI**.
+- Documentación de API con **OpenAPI**: en .NET 9+ con el generador nativo
+  (`Microsoft.AspNetCore.OpenApi`) y UI **Scalar** (ver [[openapi-scalar-dotnet]]);
+  Swashbuckle/Swagger UI solo en proyectos que sigan en .NET ≤ 8.
 
 ## Estructura de referencia
 

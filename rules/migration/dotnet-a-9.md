@@ -26,15 +26,19 @@ y el `upgrade-assistant`.
 
 - **C# 13**: colecciones `params` (más allá de arrays), nuevo tipo `System.Threading.Lock`,
   mejoras en `ref struct`.
-- **OpenAPI integrado** (`Microsoft.AspNetCore.OpenApi`): genera el documento sin Swashbuckle;
-  revisar si se retira la dependencia de Swagger.
+- **OpenAPI integrado** (`Microsoft.AspNetCore.OpenApi`): genera el documento sin Swashbuckle.
+  Microsoft **retiró Swashbuckle de la plantilla de Web API** en este salto (proyecto sin
+  mantenimiento activo, incompatible con Native AOT): aquí se retira la dependencia de
+  Swagger y la UI pasa a **Scalar**. Regla: [[openapi-scalar-dotnet]].
 - Mejoras de rendimiento en ASP.NET Core y en el GC (modos de servidor).
 - **EF Core 9**: mejoras en consultas y en el proveedor de Azure Cosmos.
 
 ## Revisión manual sugerida
 
-- Evaluar migrar la generación de OpenAPI a la nativa y retirar Swashbuckle si no se usan
-  sus extras.
+- Migrar la generación de OpenAPI a la nativa, retirar Swashbuckle por completo (paquete,
+  filtros, atributos, `launchUrl`) y montar la UI de Scalar — ver [[openapi-scalar-dotnet]].
+  Al comparar el documento con la línea base ([[linea-base-de-contrato]]), el formato cambia
+  aunque el contrato no: se comparan endpoints, verbos, códigos y esquemas.
 - Revisar usos de `lock(obj)` que puedan beneficiarse del nuevo tipo `Lock`.
 - Verificar breaking changes de EF Core 9 en consultas existentes.
 

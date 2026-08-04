@@ -39,8 +39,9 @@ endpoints. Requisitos:
 
 - **ASP.NET Core ≤ .NET 8**: `Swashbuckle.AspNetCore` (`AddSwaggerGen` + `UseSwaggerUI`),
   con comentarios XML habilitados para enriquecer el doc.
-- **ASP.NET Core .NET 9/10**: OpenAPI integrado `Microsoft.AspNetCore.OpenApi`
-  (`AddOpenApi`/`MapOpenApi`) + una UI (Swagger UI o Scalar). Ver [[dotnet-a-9]].
+- **ASP.NET Core .NET 9, 10 y siguientes**: OpenAPI integrado `Microsoft.AspNetCore.OpenApi`
+  (`AddOpenApi`/`MapOpenApi`) + UI **Scalar** (`MapScalarApiReference`); Swashbuckle salió de
+  las plantillas en .NET 9 y no se usa. Ver [[openapi-scalar-dotnet]] y [[dotnet-a-9]].
 - **Azure Functions**: extensión OpenAPI de Functions, no Swashbuckle.
   - in-process: `Microsoft.Azure.WebJobs.Extensions.OpenApi`.
   - isolated: `Microsoft.Azure.Functions.Worker.Extensions.OpenApi`.

@@ -174,7 +174,7 @@ nuevas, y no afectan al `slug` (ver *Archivar una regla reemplazada*). Categorí
 | Categoría | Contenido |
 |-----------|-----------|
 | `architecture` | Clean Architecture .NET, Frontend SPA Angular, plataforma Azure |
-| `code-standards` | .NET, Angular, TypeScript, **README al día en cada cambio** (transversal: todo cambio actualiza el README de su app o no está terminado) |
+| `code-standards` | .NET, Angular, TypeScript, **README al día en cada cambio** (transversal: todo cambio actualiza el README de su app o no está terminado), **documentación de API en .NET 9+** (OpenAPI nativo + Scalar, sin Swashbuckle) |
 | `security` | Identidad/acceso (Entra ID, RBAC, MSI), secretos (Key Vault), red/perímetro (Front Door + WAF) |
 | `observabilidad` | Logging y auditoría con Application Insights |
 | `pruebas` | Pruebas unitarias (xUnit, Moq) y calidad (SonarQube) |
